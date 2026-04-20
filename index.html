@@ -376,8 +376,9 @@ function showMemberInfo(m){
     '<div class="mi-row">'+
     '<span><b>이름</b>'+esc(m.name)+'</span>'+
     '<span><b>나이</b>'+esc((m.age===''||m.age==null)?'-':m.age)+'</span>'+
-    '<span><b>포지션</b>'+esc(m.position||'-')+'</span>'+
     '<span><b>등번호</b>'+esc(m.number||'-')+'</span>'+
+    '<span><b>포지션</b>'+esc(m.position||'-')+'</span>'+
+    '<span><b>신장</b>'+esc(m.height||'-')+'</span>'+
     '</div>'+
     '<div style="margin-top:6px">'+fee+'</div>'+
     inactive;
