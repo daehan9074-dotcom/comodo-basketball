@@ -370,7 +370,7 @@ async function checkName(){
 }
 function showMemberInfo(m){
   const info=document.getElementById('memberInfo');
-  const fee=m.paid?'<span class="mi-badge paid">회비 납부</span>':'<span class="mi-badge unpaid">회비 미납</span>';
+  const fee=m.paid?'<span class="mi-badge paid">회비 납부 완료</span>':'<span class="mi-badge unpaid">회비 미납</span>';
   const inactive=m.isInactive?'<div class="inactive-notice">⚠️ 현재 휴활 회원입니다.</div>':'';
   info.innerHTML=
     '<div class="mi-row">'+
