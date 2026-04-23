@@ -41,6 +41,7 @@
   .comment-box .comment-label{font-size:.7rem;font-weight:700;color:#2d6ea5;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
   .comment-box .comment-item{font-size:.88rem;line-height:1.55;padding:3px 0;word-break:break-word}
   .comment-box .comment-item b{color:#2d6ea5;font-weight:700;margin-right:4px}
+  .comment-box .comment-empty{color:#8ba8be;font-size:.85rem}
 
   .field{margin-bottom:22px}
   .field label.main-label{display:block;font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--label);margin-bottom:8px}
@@ -63,6 +64,8 @@
   .member-info .mi-badge{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:100px;font-size:.72rem;font-weight:700}
   .mi-badge.paid{background:#e8f4e8;color:#2c5f2e;border:1px solid #2c5f2e}
   .mi-badge.unpaid{background:#fdecea;color:#c0392b;border:1px solid #c0392b}
+  .mi-badge.reg{background:#e6f0fa;color:#1f4e8a;border:1px solid #1f4e8a}
+  .mi-badge.unreg{background:#fff4e6;color:#c27800;border:1px solid #e0a43e}
   .inactive-notice{margin-top:8px;color:#c0392b;font-size:.88rem;font-weight:600;text-align:center}
   .prev-vote{display:none;margin-top:8px;background:#fff4e6;border:1.5px solid #ffb74d;border-radius:8px;padding:10px 12px;font-size:.82rem;color:#c27800}
   .prev-vote.show{display:block}
@@ -198,9 +201,9 @@
       <div class="notice-content" id="noticeContent"><span class="notice-empty">공지사항이 없습니다.</span></div>
     </div>
 
-    <div class="comment-box" id="commentBox" style="display:none">
+    <div class="comment-box" id="commentBox">
       <div class="comment-label">💬 한마디</div>
-      <div id="commentList"></div>
+      <div id="commentList"><span class="comment-empty">아직 남긴 한마디가 없습니다.</span></div>
     </div>
 
     <form id="surveyForm" novalidate>
@@ -315,12 +318,9 @@ function getCommentHtml(){
   return items.map(a=>'<div class="comment-item"><b>'+esc(a.name)+' :</b>'+esc(a.comment)+'</div>').join('');
 }
 function renderComments(){
-  const box=document.getElementById('commentBox');
   const list=document.getElementById('commentList');
   const html=getCommentHtml();
-  if(!html){box.style.display='none';return}
-  list.innerHTML=html;
-  box.style.display='';
+  list.innerHTML=html||'<span class="comment-empty">아직 남긴 한마디가 없습니다.</span>';
 }
 function renderDays(){
   const c=document.getElementById('daysContainer');
@@ -410,6 +410,8 @@ async function checkName(){
 function showMemberInfo(m){
   const info=document.getElementById('memberInfo');
   const fee=m.isInactive?'':(m.paid?'<span class="mi-badge paid">회비 납부 완료</span>':'<span class="mi-badge unpaid">회비 미납</span>');
+  const reg=m.isInactive?'':(m.registered?'<span class="mi-badge reg">선수등록 완료</span>':'<span class="mi-badge unreg">선수등록 미완료</span>');
+  const badges=[fee,reg].filter(Boolean).join(' ');
   const inactive=m.isInactive?'<div class="inactive-notice">현재 휴활 회원입니다. 참석 가능한 날을 선택해주세요.</div>':'';
   info.innerHTML=
     '<div class="mi-row">'+
@@ -418,7 +420,7 @@ function showMemberInfo(m){
     '<span><b>등번호</b>'+esc(m.number||'-')+'</span>'+
     '<span><b>포지션</b>'+esc(m.position||'-')+'</span>'+
     '</div>'+
-    (fee?'<div style="margin-top:6px">'+fee+'</div>':'')+
+    (badges?'<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'+badges+'</div>':'')+
     inactive;
   info.classList.add('show');
   if(m.isInactive){toast('현재 휴활 회원입니다','error')}
@@ -592,7 +594,8 @@ async function admResetPage(){
 document.getElementById('statusBtn').addEventListener('click',async()=>{
   await loadInit();
   const commentHtml=getCommentHtml();
-  const commentSection=commentHtml?'<div class="comment-box" style="margin-bottom:14px"><div class="comment-label">💬 한마디</div>'+commentHtml+'</div>':'';
+  const commentBody=commentHtml||'<span class="comment-empty">아직 남긴 한마디가 없습니다.</span>';
+  const commentSection='<div class="comment-box" style="margin-bottom:14px"><div class="comment-label">💬 한마디</div>'+commentBody+'</div>';
   const voted={};
   currentAttendance.forEach(a=>{voted[a.name]=a});
   const noneAll=[];
