@@ -630,6 +630,7 @@ document.getElementById('statusBtn').addEventListener('click',async()=>{
 
 /* ===== 팀 생성기 ===== */
 let tgDay='',tgMode='num',tgNumTeams=2,tgTeams=[],tgPool=[];
+let tgSameConstraints=[],tgDiffConstraints=[];
 
 document.getElementById('teamBtn').addEventListener('click',async()=>{
   await loadInit();
@@ -643,6 +644,13 @@ function tgTeamLabel(i){
   return String.fromCharCode(65+i);
 }
 function renderTeamGenerator(){
+  const attendees=getAttendees(tgDay);
+  const guests=collectGuests();
+  const allPlayers=attendees.concat(guests);
+  const posOrder={가드:0,포워드:1,센터:2};
+  const posLabel={가드:'G',포워드:'F',센터:'C'};
+  const sortedPlayers=[...allPlayers].sort((a,b)=>(posOrder[a.position]??3)-(posOrder[b.position]??3));
+
   const dayBtns=currentDays.map(d=>
     '<button class="tg-btn'+(tgDay===d.title?' active':'')+'" onclick="tgSetDay(\''+esc(d.title).replace(/'/g,"\\'")+'\')">'+esc(d.title)+'</button>'
   ).join('');
@@ -656,14 +664,55 @@ function renderTeamGenerator(){
     const active=(tgMode===c.mode)&&(c.mode==='ybob'||tgNumTeams===c.n);
     return '<button class="tg-btn'+(active?' active':'')+'" onclick="tgSetComposition(\''+c.mode+'\','+c.n+')">'+c.label+'</button>';
   }).join('');
+
+  const makeSelect=(value,handler)=>{
+    const opts=sortedPlayers.map(m=>{
+      const pos=posLabel[m.position]||'-';
+      const label=pos+' '+m.name+(m.isGuest?' (게스트)':'');
+      return '<option value="'+esc(m.name)+'"'+(m.name===value?' selected':'')+'>'+esc(label)+'</option>';
+    }).join('');
+    return '<select onchange="'+handler+'"><option value="">-- 선택 --</option>'+opts+'</select>';
+  };
+
+  const sameRows=tgSameConstraints.map((members,rowIdx)=>{
+    const selects=members.map((name,mIdx)=>makeSelect(name,'tgUpdateSame('+rowIdx+','+mIdx+',this.value)')).join('');
+    return '<div class="constraint-row">'+selects+
+      '<button onclick="tgAddSameMember('+rowIdx+')" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.75rem;flex-shrink:0">+</button>'+
+      '<button onclick="tgRemoveSame('+rowIdx+')">✕</button></div>';
+  }).join('');
+
+  const diffRows=tgDiffConstraints.map((members,rowIdx)=>{
+    const selects=members.map((name,mIdx)=>makeSelect(name,'tgUpdateDiff('+rowIdx+','+mIdx+',this.value)')).join('');
+    const addBtn=members.length<tgNumTeams?'<button onclick="tgAddDiffMember('+rowIdx+')" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.75rem;flex-shrink:0">+</button>':'';
+    return '<div class="constraint-row">'+selects+addBtn+'<button onclick="tgRemoveDiff('+rowIdx+')">✕</button></div>';
+  }).join('');
+
   openModal(
     '<h3>🏀 팀 생성기</h3>'+
-    '<div class="tg-field"><label>진행일</label><div class="tg-btn-row">'+dayBtns+'</div></div>'+
+    '<div class="tg-field">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
+        '<label style="font-size:.78rem;font-weight:700;color:var(--label);text-transform:uppercase;letter-spacing:.05em;margin:0">진행일</label>'+
+        '<button onclick="closeModal()" style="padding:4px 12px;border:1.5px solid #ccc;background:#f8f8f8;border-radius:7px;font-family:inherit;font-size:.78rem;cursor:pointer;color:#555;font-weight:600">닫기</button>'+
+      '</div>'+
+      '<div class="tg-btn-row">'+dayBtns+'</div>'+
+    '</div>'+
     '<div class="tg-field"><label>팀 구성</label><div class="tg-btn-row">'+compBtns+'</div></div>'+
     '<div class="modal-actions">'+
       '<button class="btn-primary" onclick="tgBuild()">수동 배정</button>'+
       '<button class="btn-primary" onclick="tgRandom()">🎲 랜덤 배정</button>'+
-      '<button class="btn-secondary" onclick="closeModal()">닫기</button>'+
+    '</div>'+
+    '<div style="margin-top:14px;border-top:1px solid #eee;padding-top:12px">'+
+      '<div style="font-size:.78rem;font-weight:700;color:var(--label);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">분배 조건</div>'+
+      '<div style="margin-bottom:12px">'+
+        '<div style="font-size:.8rem;font-weight:700;color:#2c5f2e;margin-bottom:6px">같은 팀</div>'+
+        (sameRows||'<div style="font-size:.8rem;color:#aaa;margin-bottom:4px">조건 없음</div>')+
+        '<button class="tg-add-guest" onclick="tgAddSame()" style="padding:5px 12px;font-size:.8rem;margin-top:4px">+ 추가</button>'+
+      '</div>'+
+      '<div>'+
+        '<div style="font-size:.8rem;font-weight:700;color:#c0392b;margin-bottom:6px">다른 팀</div>'+
+        (diffRows||'<div style="font-size:.8rem;color:#aaa;margin-bottom:4px">조건 없음</div>')+
+        '<button class="tg-add-guest" onclick="tgAddDiff()" style="padding:5px 12px;font-size:.8rem;margin-top:4px">+ 추가</button>'+
+      '</div>'+
     '</div>'+
     '<div id="tgResult"></div>'
   );
@@ -674,6 +723,7 @@ function tgSetComposition(mode,n){
   tgMode=mode;
   if(mode==='ybob')tgNumTeams=2;else tgNumTeams=n;
   tgTeams=[];tgPool=[];
+  tgDiffConstraints=tgDiffConstraints.map(members=>members.slice(0,tgNumTeams));
   renderTeamGenerator();
 }
 function getAttendees(day){
@@ -709,19 +759,92 @@ function tgRandom(){
   const guests=collectGuests();
   if(attendees.length===0&&guests.length===0){toast(tgDay+' 참석자가 없습니다','error');return}
   if(tgMode==='ybob'){tgBuild();return}
-  tgTeams=Array.from({length:tgNumTeams},()=>[]);
-  const byPos={가드:[],포워드:[],센터:[],기타:[]};
-  attendees.concat(guests).forEach(m=>{(byPos[m.position]||byPos.기타).push(m)});
-  Object.keys(byPos).forEach(p=>byPos[p].sort(()=>Math.random()-.5));
-  ['가드','포워드','센터','기타'].forEach(pos=>{
-    byPos[pos].forEach(m=>{
-      const ti=tgTeams.map((t,i)=>({i,n:t.length})).sort((a,b)=>a.n-b.n)[0].i;
-      tgTeams[ti].push(m);
+
+  const allPlayers=attendees.concat(guests);
+  const nameToPlayer={};
+  allPlayers.forEach(m=>{nameToPlayer[m.name]=m});
+
+  const validSame=tgSameConstraints.map(members=>members.filter(n=>n&&nameToPlayer[n])).filter(g=>g.length>=2);
+  const validDiff=tgDiffConstraints.map(members=>members.filter(n=>n&&nameToPlayer[n])).filter(g=>g.length>=2);
+
+  // Union-Find로 같은 팀 그룹 생성
+  const parent={};
+  allPlayers.forEach(m=>{parent[m.name]=m.name});
+  function find(x){if(parent[x]!==x)parent[x]=find(parent[x]);return parent[x]}
+  function union(x,y){const px=find(x),py=find(y);if(px!==py)parent[px]=py}
+  validSame.forEach(members=>{for(let i=1;i<members.length;i++)union(members[0],members[i])});
+
+  const groupMap={};
+  allPlayers.forEach(m=>{const root=find(m.name);if(!groupMap[root])groupMap[root]=[];groupMap[root].push(m)});
+  const groups=Object.values(groupMap);
+
+  // 단독 그룹(제약 없음)과 묶음 그룹 분리
+  const singleGroups=groups.filter(g=>g.length===1);
+  const multiGroups=groups.filter(g=>g.length>1);
+
+  // 포지션 분산 점수 (낮을수록 균형)
+  function balanceScore(teams){
+    return ['가드','포워드','센터'].reduce((sum,pos)=>{
+      const counts=teams.map(t=>t.filter(m=>m.position===pos).length);
+      const avg=counts.reduce((a,b)=>a+b,0)/teams.length;
+      return sum+counts.reduce((s,c)=>s+(c-avg)*(c-avg),0);
+    },0);
+  }
+
+  let bestTeams=null,bestViolations=Infinity,bestBalance=Infinity;
+
+  for(let attempt=0;attempt<150;attempt++){
+    const teams=Array.from({length:tgNumTeams},()=>[]);
+
+    // 묶음 그룹 먼저 배정 (매 시도마다 순서 섞기)
+    [...multiGroups].sort(()=>Math.random()-.5).forEach(group=>{
+      const ti=teams.map((t,i)=>({i,n:t.length})).sort((a,b)=>a.n-b.n)[0].i;
+      [...group].sort(()=>Math.random()-.5).forEach(m=>teams[ti].push(m));
     });
-  });
+
+    // 단독 인원은 포지션별(G→F→C→기타)로 분류 후 최소 팀에 순차 배정
+    const byPos={가드:[],포워드:[],센터:[],기타:[]};
+    singleGroups.forEach(g=>{(byPos[g[0].position]||byPos.기타).push(g[0])});
+    Object.keys(byPos).forEach(p=>byPos[p].sort(()=>Math.random()-.5));
+    ['가드','포워드','센터','기타'].forEach(pos=>{
+      byPos[pos].forEach(m=>{
+        const ti=teams.map((t,i)=>({i,n:t.length})).sort((a,b)=>a.n-b.n)[0].i;
+        teams[ti].push(m);
+      });
+    });
+
+    const violations=validDiff.filter(members=>{
+      const idxs=members.map(name=>{let r=-1;teams.forEach((t,i)=>{if(t.some(m=>m.name===name))r=i});return r}).filter(i=>i!==-1);
+      return new Set(idxs).size<idxs.length;
+    }).length;
+
+    const balance=balanceScore(teams);
+
+    if(violations<bestViolations||(violations===bestViolations&&balance<bestBalance)){
+      bestViolations=violations;
+      bestBalance=balance;
+      bestTeams=teams.map(t=>[...t]);
+      if(violations===0&&balance===0)break;
+    }
+  }
+
+  // 각 팀 내 G→F→C→기타 순 정렬
+  const sortOrder={가드:0,포워드:1,센터:2};
+  bestTeams.forEach(t=>t.sort((a,b)=>(sortOrder[a.position]??3)-(sortOrder[b.position]??3)));
+
+  tgTeams=bestTeams;
   tgPool=[];
+  if(bestViolations>0)toast('일부 다른 팀 조건을 만족하지 못했습니다','error');
   renderTeamResult();
 }
+function tgAddSame(){tgSameConstraints.push(['','']);renderTeamGenerator()}
+function tgAddSameMember(rowIdx){if(tgSameConstraints[rowIdx])tgSameConstraints[rowIdx].push('');renderTeamGenerator()}
+function tgUpdateSame(rowIdx,mIdx,val){if(tgSameConstraints[rowIdx])tgSameConstraints[rowIdx][mIdx]=val}
+function tgRemoveSame(rowIdx){tgSameConstraints.splice(rowIdx,1);renderTeamGenerator()}
+function tgAddDiff(){tgDiffConstraints.push(['','']);renderTeamGenerator()}
+function tgAddDiffMember(rowIdx){if(tgDiffConstraints[rowIdx]&&tgDiffConstraints[rowIdx].length<tgNumTeams)tgDiffConstraints[rowIdx].push('');renderTeamGenerator()}
+function tgUpdateDiff(rowIdx,mIdx,val){if(tgDiffConstraints[rowIdx])tgDiffConstraints[rowIdx][mIdx]=val}
+function tgRemoveDiff(rowIdx){tgDiffConstraints.splice(rowIdx,1);renderTeamGenerator()}
 function tgMemberDisplay(m){
   return m.isGuest?'게스트('+esc(m.name)+')':esc(m.name);
 }
