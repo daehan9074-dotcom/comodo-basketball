@@ -630,7 +630,7 @@ document.getElementById('statusBtn').addEventListener('click',async()=>{
 
 /* ===== 팀 생성기 ===== */
 let tgDay='',tgMode='num',tgNumTeams=2,tgTeams=[],tgPool=[];
-let tgSameConstraints=[],tgDiffConstraints=[];
+let tgSameConstraints=[],tgDiffConstraints=[],tgExcluded=new Set();
 
 document.getElementById('teamBtn').addEventListener('click',async()=>{
   await loadInit();
@@ -711,7 +711,10 @@ function tgRandom(){
   if(attendees.length===0&&guests.length===0){toast(tgDay+' 참석자가 없습니다','error');return}
   if(tgMode==='ybob'){tgBuild();return}
 
-  const allPlayers=attendees.concat(guests);
+  const allPlayersRaw=attendees.concat(guests);
+  const excludedPlayers=allPlayersRaw.filter(m=>tgExcluded.has(m.name));
+  const allPlayers=allPlayersRaw.filter(m=>!tgExcluded.has(m.name));
+  if(allPlayers.length===0){tgTeams=Array.from({length:tgNumTeams},()=>[]);tgPool=[...excludedPlayers];renderTeamResult();return}
   const nameToPlayer={};
   allPlayers.forEach(m=>{nameToPlayer[m.name]=m});
 
@@ -784,7 +787,7 @@ function tgRandom(){
   bestTeams.forEach(t=>t.sort((a,b)=>(sortOrder[a.position]??3)-(sortOrder[b.position]??3)));
 
   tgTeams=bestTeams;
-  tgPool=[];
+  tgPool=[...excludedPlayers];
   if(bestViolations>0)toast('일부 다른 팀 조건을 만족하지 못했습니다','error');
   renderTeamResult();
 }
@@ -796,6 +799,8 @@ function tgAddDiff(){tgDiffConstraints.push(['','']);renderTeamGenerator()}
 function tgAddDiffMember(rowIdx){if(tgDiffConstraints[rowIdx]&&tgDiffConstraints[rowIdx].length<tgNumTeams)tgDiffConstraints[rowIdx].push('');renderTeamGenerator()}
 function tgUpdateDiff(rowIdx,mIdx,val){if(tgDiffConstraints[rowIdx])tgDiffConstraints[rowIdx][mIdx]=val}
 function tgRemoveDiff(rowIdx){tgDiffConstraints.splice(rowIdx,1);renderTeamGenerator()}
+function tgExclude(pi){const m=tgPool[pi];if(m)tgExcluded.add(m.name);renderTeamResult()}
+function tgUnexclude(pi){const m=tgPool[pi];if(m)tgExcluded.delete(m.name);renderTeamResult()}
 function tgMemberDisplay(m){
   return m.isGuest?'게스트('+esc(m.name)+')':esc(m.name);
 }
@@ -811,12 +816,20 @@ function renderTeamResult(){
   const teamBtns=(pi)=>'<span class="pool-team-btns">'+
     Array.from({length:count},(_,ti)=>'<button class="pool-team-btn" onclick="tgAssign('+pi+','+ti+')">'+tgTeamLabel(ti)+'</button>').join('')+
     '</span>';
+  const poolNonExcluded=tgPool.filter(m=>!tgExcluded.has(m.name));
   const poolHtml='<div class="pool-box"><h5>대기 (팀 버튼 클릭)</h5>'+
     tgPool.map((m,i)=>{
-      const delBtn=m.isGuest?'<button class="pool-team-btn pool-del" onclick="tgDeleteGuest('+i+')">X</button>':'';
-      return '<span class="pool-player">'+posTag(m.position)+'<span class="pp-name">'+tgMemberDisplay(m)+'</span>'+teamBtns(i)+delBtn+'</span>';
+      const isExcl=tgExcluded.has(m.name);
+      const nameSpan='<span class="pp-name">'+tgMemberDisplay(m)+(isExcl?' <span style="color:#999;font-size:.7rem">(제외)</span>':'')+'</span>';
+      const guestDel=m.isGuest?'<button class="pool-team-btn pool-del" onclick="tgDeleteGuest('+i+')">X</button>':'';
+      if(isExcl){
+        return '<span class="pool-player" style="background:#ddd;border-color:#bbb">'+posTag(m.position)+nameSpan+teamBtns(i)+
+          '<button class="pool-team-btn" style="background:#666" onclick="tgUnexclude('+i+')">X</button>'+guestDel+'</span>';
+      }
+      return '<span class="pool-player">'+posTag(m.position)+nameSpan+teamBtns(i)+
+        '<button class="pool-team-btn" style="background:#888;font-size:.65rem;min-width:auto;padding:0 5px" onclick="tgExclude('+i+')">제외</button>'+guestDel+'</span>';
     }).join('')+
-    (tgPool.length===0?'<span style="color:#aaa;font-size:.8rem">모두 배정됨</span>':'')+
+    (poolNonExcluded.length===0?'<span style="color:#aaa;font-size:.8rem">모두 배정됨</span>':'')+
     '<div><button class="tg-add-guest" onclick="tgAddGuestDialog()">+ 게스트 추가</button></div>'+
     '</div>';
   const hasTeams=tgTeams.some(t=>t.length>0);
