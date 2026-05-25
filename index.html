@@ -322,6 +322,7 @@ function renderComments(){
   const html=getCommentHtml();
   list.innerHTML=html||'<span class="comment-empty">아직 남긴 한마디가 없습니다.</span>';
 }
+let _daysContainerBound=false;
 function renderDays(){
   const c=document.getElementById('daysContainer');
   const blocks=currentDays.map((d)=>
@@ -346,17 +347,22 @@ function renderDays(){
   updateDayBlocks();
 }
 function attachDayEvents(){
-  document.querySelectorAll('.day-block').forEach(b=>{
-    b.addEventListener('click',(e)=>{
-      if(e.target.tagName==='INPUT'||e.target.tagName==='LABEL')return;
-      const cb=b.querySelector('input[type="checkbox"]');
-      cb.checked=!cb.checked;
-      handleDayChange(cb);
-    });
+  if(_daysContainerBound)return;
+  const c=document.getElementById('daysContainer');
+  if(!c)return;
+  c.addEventListener('click',(e)=>{
+    const block=e.target.closest('.day-block');
+    if(!block)return;
+    if(e.target.tagName==='INPUT'||e.target.tagName==='LABEL')return;
+    const cb=block.querySelector('input[type="checkbox"]');
+    if(!cb)return;
+    cb.checked=!cb.checked;
+    handleDayChange(cb);
   });
-  document.querySelectorAll('.day-block input[type="checkbox"]').forEach(cb=>{
-    cb.addEventListener('change',(e)=>handleDayChange(e.target));
+  c.addEventListener('change',(e)=>{
+    if(e.target.matches('input[type="checkbox"]'))handleDayChange(e.target);
   });
+  _daysContainerBound=true;
 }
 function updateDayBlocks(){
   document.querySelectorAll('.day-block').forEach(b=>{
@@ -597,6 +603,7 @@ async function admResetPage(){
 
 /* ===== 참가 현황 ===== */
 document.getElementById('statusBtn').addEventListener('click',async()=>{
+  openModal('<h3>📊 참가 인원 현황</h3><p style="text-align:center;color:#888;padding:30px 0">불러오는 중...</p>');
   await loadInit();
   const noticeBody=noticeText.trim()
     ?'<div class="notice-content">'+esc(noticeText)+'</div>'
@@ -638,6 +645,7 @@ let tgDay='',tgMode='num',tgNumTeams=2,tgTeams=[],tgPool=[];
 let tgSameConstraints=[],tgDiffConstraints=[],tgExcluded=new Set();
 
 document.getElementById('teamBtn').addEventListener('click',async()=>{
+  openModal('<h3>🏀 팀 생성기</h3><p style="text-align:center;color:#888;padding:30px 0">불러오는 중...</p>');
   await loadInit();
   if(currentDays.length>0&&!currentDays.some(d=>d.title===tgDay))tgDay=currentDays[0].title;
   tgTeams=[];tgPool=[];
@@ -687,9 +695,11 @@ function getAttendees(day){
   return currentMembers.filter(m=>voted.includes(m.name));
 }
 function collectGuests(){
+  // 다이얼로그로 추가한 임시 게스트(isAdHoc)만 수집.
+  // 시트 등록 게스트는 getAttendees()에서 이미 포함되므로 중복 방지.
   const guests=[];
-  tgTeams.forEach(t=>t.forEach(m=>{if(m&&m.isGuest)guests.push(m)}));
-  tgPool.forEach(m=>{if(m&&m.isGuest)guests.push(m)});
+  tgTeams.forEach(t=>t.forEach(m=>{if(m&&m.isAdHoc)guests.push(m)}));
+  tgPool.forEach(m=>{if(m&&m.isAdHoc)guests.push(m)});
   return guests;
 }
 function tgBuild(){
@@ -752,7 +762,7 @@ function tgRandom(){
 
   let bestTeams=null,bestViolations=Infinity,bestBalance=Infinity;
 
-  for(let attempt=0;attempt<150;attempt++){
+  for(let attempt=0;attempt<80;attempt++){
     const teams=Array.from({length:tgNumTeams},()=>[]);
 
     // 묶음 그룹 먼저 배정 (매 시도마다 순서 섞기)
@@ -826,7 +836,7 @@ function renderTeamResult(){
     tgPool.map((m,i)=>{
       const isExcl=tgExcluded.has(m.name);
       const nameSpan='<span class="pp-name">'+tgMemberDisplay(m)+(isExcl?' <span style="color:#999;font-size:.7rem">(제외)</span>':'')+'</span>';
-      const guestDel=m.isGuest?'<button class="pool-team-btn pool-del" onclick="tgDeleteGuest('+i+')">X</button>':'';
+      const guestDel=m.isAdHoc?'<button class="pool-team-btn pool-del" onclick="tgDeleteGuest('+i+')">X</button>':'';
       if(isExcl){
         return '<span class="pool-player" style="background:#ddd;border-color:#bbb">'+posTag(m.position)+nameSpan+teamBtns(i)+
           '<button class="pool-team-btn" style="background:#666" onclick="tgUnexclude('+i+')">X</button>'+guestDel+'</span>';
@@ -928,7 +938,7 @@ function tgAssign(pi,ti){
 }
 function tgDeleteGuest(pi){
   const m=tgPool[pi];
-  if(!m||!m.isGuest)return;
+  if(!m||!m.isAdHoc)return;
   tgPool.splice(pi,1);
   renderTeamResult();
 }
@@ -954,7 +964,7 @@ function tgConfirmGuest(){
   const pos=(document.getElementById('guestPos')||{}).value;
   const n=String(name||'').trim();
   if(!n){toast('이름을 입력하세요','error');return}
-  tgPool.push({name:n,position:pos||'가드',isGuest:true,age:null});
+  tgPool.push({name:n,position:pos||'가드',isGuest:true,isAdHoc:true,age:null});
   renderTeamGenerator();
 }
 
