@@ -623,8 +623,13 @@ document.getElementById('statusBtn').addEventListener('click',async()=>{
     currentMembers.forEach(m=>{
       const a=voted[m.name];
       if(!a)return;
-      if(a.days.includes('모두 불참')){no.push(m.name);return}
-      if(a.days.includes(d.title))yes.push(m.name);else no.push(m.name);
+      const isRegular=m.memberType==='정회원';
+      if(a.days.includes('모두 불참')){
+        if(isRegular)no.push(m.name);
+        return;
+      }
+      if(a.days.includes(d.title))yes.push(m.name);
+      else if(isRegular)no.push(m.name);
     });
     return '<div class="status-section"><h4>'+esc(d.title)+'</h4>'+
       '<div class="status-row"><span><span class="tag tag-yes">참석</span>'+yes.length+'명</span></div>'+
