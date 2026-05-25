@@ -409,21 +409,26 @@ async function checkName(){
 }
 function showMemberInfo(m){
   const info=document.getElementById('memberInfo');
-  const fee=m.isInactive?'':(m.paid?'<span class="mi-badge paid">회비 납부 완료</span>':'<span class="mi-badge unpaid">회비 미납</span>');
-  const reg=m.isInactive?'':(m.registered?'<span class="mi-badge reg">선수등록 완료</span>':'<span class="mi-badge unreg">선수등록 미완료</span>');
+  const hideBadges=m.isInactive||m.isGuest;
+  const fee=hideBadges?'':(m.paid?'<span class="mi-badge paid">회비 납부 완료</span>':'<span class="mi-badge unpaid">회비 미납</span>');
+  const reg=hideBadges?'':(m.registered?'<span class="mi-badge reg">선수등록 완료</span>':'<span class="mi-badge unreg">선수등록 미완료</span>');
   const badges=[fee,reg].filter(Boolean).join(' ');
-  const inactive=m.isInactive?'<div class="inactive-notice">현재 휴활 회원입니다. 참석 가능한 날을 선택해주세요.</div>':'';
+  let notice='';
+  if(m.isGuest)notice='<div class="inactive-notice">현재 게스트입니다. 참석 가능한 날을 선택해주세요.</div>';
+  else if(m.isInactive)notice='<div class="inactive-notice">현재 휴활 회원입니다. 참석 가능한 날을 선택해주세요.</div>';
+  const numberSpan=m.isGuest?'':'<span><b>등번호</b>'+esc(m.number||'-')+'</span>';
   info.innerHTML=
     '<div class="mi-row">'+
     '<span><b>이름</b>'+esc(m.name)+'</span>'+
     '<span><b>나이</b>'+esc((m.age===''||m.age==null)?'-':m.age)+'</span>'+
-    '<span><b>등번호</b>'+esc(m.number||'-')+'</span>'+
+    numberSpan+
     '<span><b>포지션</b>'+esc(m.position||'-')+'</span>'+
     '</div>'+
     (badges?'<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'+badges+'</div>':'')+
-    inactive;
+    notice;
   info.classList.add('show');
-  if(m.isInactive){toast('현재 휴활 회원입니다','error')}
+  if(m.isGuest){toast('게스트로 참석합니다','success')}
+  else if(m.isInactive){toast('현재 휴활 회원입니다','error')}
 }
 function fillDays(days){
   currentDays.forEach(d=>{
