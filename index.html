@@ -10,16 +10,41 @@
   2. 팀 로고는 같은 폴더에 logo.png 로 저장하세요 (파일이 없으면 자동 숨김)
   3. 관리자 비밀번호는 기본 1234 (apps-script-code.js의 ADMIN_PW 에서 변경)
 -->
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&display=swap" rel="stylesheet" />
+<script>
+/* ===== ⚡ 최우선 초기 데이터 요청 =====
+   CSS/폰트 로딩과 병렬로 init 요청을 먼저 띄운다 (body 스크립트를 기다리지 않음) */
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzMIHc-An1WwdWQdRnUe13KYk-VWOivULbh4uRaVdxze_--0l0g-PhZu_su89ssjE0d/exec";
+
+function fetchJsonp(url, payload){
+  return new Promise((resolve,reject)=>{
+    const cb='__jcb_'+Date.now()+'_'+Math.floor(Math.random()*1e6);
+    const script=document.createElement('script');
+    const timer=setTimeout(()=>{cleanup();reject(new Error('시간 초과'))},20000);
+    window[cb]=(d)=>{clearTimeout(timer);cleanup();resolve(d)};
+    function cleanup(){delete window[cb];if(script.parentNode)script.parentNode.removeChild(script)}
+    let full=url+(url.includes('?')?'&':'?')+'callback='+cb;
+    if(payload){full+='&payload='+encodeURIComponent(JSON.stringify(payload))}
+    script.src=full;
+    script.onerror=()=>{clearTimeout(timer);cleanup();reject(new Error('요청 실패'))};
+    (document.head||document.documentElement).appendChild(script);
+  });
+}
+window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.warn('init 실패',e);return null});
+</script>
+<link rel="preconnect" href="https://script.google.com" />
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin />
 <style>
   :root{
     --green:#2c5f2e; --green-mid:#3d7a3f; --green-light:#e8f4e8;
     --green-stripe:#f0f7f0; --beige:#f5f2ec; --white:#fff;
     --field-bg:#fafaf8; --border:#d4cfc7; --text:#1a1a1a;
     --label:#6b6560; --error:#c0392b; --shadow:0 4px 24px rgba(44,95,46,.10),0 1px 6px rgba(0,0,0,.06);
+    /* 웹폰트 대신 기기 내장 폰트 사용 → 다운로드 0바이트, 텍스트 즉시 표시.
+       한글은 글리프 단위 폴백으로 맑은고딕(윈도우)/애플산돌고딕(맥·아이폰)이 자동 적용됩니다. */
+    --font:system-ui,-apple-system,'Segoe UI',Roboto,'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic','맑은 고딕',sans-serif;
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Noto Sans KR',sans-serif;background:var(--beige);color:var(--text);min-height:100vh;padding:28px 14px 80px}
+  body{font-family:var(--font);background:var(--beige);color:var(--text);min-height:100vh;padding:28px 14px 80px;-webkit-text-size-adjust:100%}
   .top-bar{max-width:600px;margin:0 auto 14px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
   .top-btn{background:var(--white);border:1.5px solid var(--green);color:var(--green);padding:8px 14px;border-radius:10px;font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;transition:.18s}
   .top-btn:hover{background:var(--green);color:#fff}
@@ -169,9 +194,160 @@
 
   /* 복사 박스 */
   .copy-box{background:var(--green-light);border:1.5px solid var(--green);border-radius:10px;padding:12px 14px;margin-top:16px}
-  .copy-box pre{font-family:'Noto Sans KR',sans-serif;font-size:.9rem;line-height:1.75;white-space:pre-wrap;margin-bottom:10px;color:#1a1a1a}
+  .copy-box pre{font-family:var(--font);font-size:.9rem;line-height:1.75;white-space:pre-wrap;margin-bottom:10px;color:#1a1a1a}
   .btn-copy{background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:600;font-size:.85rem;transition:.18s}
   .btn-copy:hover{background:var(--green-mid)}
+
+  /* 로딩 스켈레톤 */
+  .sk{background:linear-gradient(90deg,#ececec 25%,#f6f6f6 37%,#ececec 63%);background-size:400% 100%;animation:skl 1.3s ease infinite;border-radius:8px}
+  @keyframes skl{0%{background-position:100% 50%}100%{background-position:0 50%}}
+  .sk-line{height:13px;margin:7px 0}
+  .sk-block{height:74px;margin-bottom:10px;border-radius:12px}
+
+  /* ===== 참석자 현황 한 줄 요약 ===== */
+  .att-summary{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;background:var(--green-light);border:1.5px solid #c6ddc6;border-radius:12px;padding:12px 15px;margin-bottom:20px}
+  .att-summary .as-item{font-size:.9rem;font-weight:600;color:var(--green);white-space:nowrap}
+  .att-summary .as-item b{font-size:1.05rem;font-weight:800;margin:0 1px}
+  .att-summary .as-item.past{color:#a0a0a0;text-decoration:line-through;text-decoration-thickness:1.5px}
+  .att-summary .as-empty{font-size:.85rem;color:#8aa88a}
+  .att-summary .sk-line{width:45%;height:14px;margin:0}
+
+  /* ===== 공용 팝업 레이어 (모달 위에 겹쳐 뜸) ===== */
+  #alertLayer{z-index:1900}
+  #alertBox{max-width:400px;padding:22px}
+  #alertBox h3{margin-bottom:12px}
+  .pop-msg{font-size:.95rem;line-height:1.65;white-space:pre-line;text-align:center;margin:8px 0 4px;color:var(--text)}
+  .pop-sub{font-size:.82rem;color:var(--label);text-align:center;margin-bottom:4px}
+
+  /* ===== 넓은 모달 (기록지 / 스탯) ===== */
+  .modal.wide{max-width:1140px}
+  .ld{text-align:center;color:#888;padding:34px 0;font-size:.9rem}
+  .rs-hd{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .rs-hd h3{margin:0}
+  .rs-sub{font-size:.8rem;color:var(--label);font-weight:600}
+
+  /* 기록지 상단 고정 툴바 */
+  .rs-toolbar{position:sticky;top:0;z-index:20;background:#fff;margin:0 -26px 8px;padding:8px 26px 10px;border-bottom:1.5px solid #eee}
+  .rs-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .rs-row+.rs-row{margin-top:7px}
+  .rs-tab{flex:1;min-width:110px;padding:11px 8px;border:2px solid var(--border);background:var(--field-bg);border-radius:10px;font-family:inherit;font-size:.9rem;font-weight:700;cursor:pointer;transition:.15s}
+  .rs-tab.on{border-color:#1a1a1a;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+  .rs-mbtn{flex:1;min-width:88px;padding:13px 8px;border:2px solid var(--border);background:var(--field-bg);color:#777;border-radius:10px;font-family:inherit;font-size:1rem;font-weight:800;cursor:pointer;transition:.15s}
+  .rs-mbtn.on{background:var(--green);border-color:var(--green);color:#fff;box-shadow:0 3px 10px rgba(44,95,46,.35)}
+  .rs-mbtn.minus.on{background:#c0392b;border-color:#c0392b;box-shadow:0 3px 10px rgba(192,57,43,.35)}
+  .rs-tool{padding:11px 13px;border:1.5px solid var(--border);background:#fff;border-radius:10px;font-family:inherit;font-size:.84rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:.15s}
+  .rs-tool:hover{background:#f2f0ec}
+  .rs-tool.warn{border-color:#e0a43e;color:#a56a00}
+  .rs-tool.go{background:var(--green);border-color:var(--green);color:#fff}
+  .rs-tool.go:disabled{opacity:.6;cursor:not-allowed}
+
+  /* 점수판 */
+  .rs-score{display:flex;align-items:stretch;gap:0;border-radius:11px;overflow:hidden;margin:2px 0 4px;border:1.5px solid var(--border)}
+  .rs-score .sc{flex:1;padding:9px 10px;text-align:center;font-weight:800;line-height:1.25}
+  .rs-score .sc .sc-t{font-size:.72rem;opacity:.85;font-weight:700}
+  .rs-score .sc .sc-n{font-size:1.35rem}
+  .rs-score .sc-vs{display:flex;align-items:center;padding:0 10px;background:#f2efe9;color:#888;font-size:.78rem;font-weight:700}
+
+  /* 기록지 표 */
+  .rs-tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:10px;background:#fff}
+  .rs-tbl{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%}
+  .rs-tbl th,.rs-tbl td{border-right:1px solid #e4e0d9;border-bottom:1px solid #e4e0d9;text-align:center;padding:0;white-space:nowrap}
+  .rs-tbl th{font-size:.66rem;font-weight:700;line-height:1.2;padding:5px 3px;min-width:48px}
+  .rs-tbl th.rs-code{font-size:.72rem;letter-spacing:.02em}
+  .rs-tbl .rs-name{position:sticky;left:0;z-index:2;min-width:84px;width:84px;max-width:84px;text-align:left;background:#fff;border-right:2px solid #c9c3ba}
+  .rs-tbl thead .rs-name{z-index:4}
+  .rs-tbl tfoot .rs-name{z-index:3;background:#efece5}
+  .rs-nbtn{width:100%;background:none;border:none;font-family:inherit;font-size:.84rem;font-weight:700;color:var(--text);text-align:left;padding:9px 7px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rs-nbtn:hover{color:var(--green);text-decoration:underline}
+  .rs-cell{min-width:48px;height:42px;cursor:pointer;font-size:1rem;font-weight:800;background:#fff;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:background .12s}
+  .rs-cell:active{background:#cfe8cf}
+  .rs-cell.zero{color:#cdc8c0;font-weight:600}
+  .rs-cell.hit{animation:rsHit .35s ease}
+  @keyframes rsHit{0%{background:#ffe08a}100%{background:#fff}}
+  .modal.rs-minus .rs-cell:active{background:#f6cfc9}
+  .modal.rs-minus .rs-tblwrap{border-color:#c0392b;box-shadow:0 0 0 2px rgba(192,57,43,.15)}
+  @keyframes rsHitM{0%{background:#f6cfc9}100%{background:#fff}}
+  .modal.rs-minus .rs-cell.hit{animation:rsHitM .35s ease}
+  .rs-ro{font-size:.78rem;color:#7d766c;background:#f8f7f4;font-weight:600}
+  .rs-pts{background:#fff9e3;color:#8a6a00;font-size:.92rem;font-weight:800}
+  .rs-tbl tfoot td{background:#efece5;font-weight:800;font-size:.88rem;height:36px}
+  .rs-tbl tfoot td.rs-ro{background:#e9e5dd;font-size:.76rem}
+
+  /* 기록지 설정 화면 */
+  .rs-card{border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--field-bg)}
+  .rs-card h5{font-size:.9rem;font-weight:700;margin-bottom:7px;display:flex;align-items:center;gap:7px}
+  .rs-chip{display:inline-block;padding:2px 9px;border-radius:100px;font-size:.72rem;font-weight:700;border:1px solid rgba(0,0,0,.15)}
+  .rs-names{font-size:.83rem;color:#555;line-height:1.6;word-break:keep-all}
+  .rs-sw{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;align-items:center}
+  .rs-swb{width:28px;height:28px;border-radius:50%;border:2px solid #ddd;cursor:pointer;padding:0;flex-shrink:0}
+  .rs-swb.on{border-color:#1a1a1a;box-shadow:0 0 0 2px rgba(0,0,0,.12)}
+  .rs-mini{margin-left:auto;padding:5px 11px;border:1.5px solid var(--green);background:#fff;color:var(--green);border-radius:8px;font-family:inherit;font-size:.78rem;font-weight:700;cursor:pointer;transition:.15s}
+  .rs-mini:hover{background:var(--green);color:#fff}
+  .rs-mini.del{margin-left:0;border-color:#d9a6a0;color:#c0392b}
+  .rs-mini.del:hover{background:#c0392b;border-color:#c0392b;color:#fff}
+  .rs-plist{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .rs-pchip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #d8d3ca;border-radius:100px;padding:4px 6px 4px 11px;font-size:.82rem;font-weight:600}
+  .rs-pchip .pos{color:var(--green);font-weight:700;font-size:.7rem}
+  .rs-pchip button{background:#c0392b;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:.68rem;line-height:1;cursor:pointer;padding:0;flex-shrink:0}
+  .rs-empty{font-size:.82rem;color:#aaa}
+  .rs-lbl{display:block;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--label);margin-bottom:6px}
+  .rs-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .rs-inline input[type="date"],.rs-inline input[type="number"],.rs-inline select{width:auto;min-width:130px}
+  .rs-warn{background:#fff4e6;border:1.5px solid #ffb74d;border-radius:10px;padding:11px 13px;font-size:.84rem;color:#a56a00;line-height:1.6;margin-bottom:10px}
+
+  /* ===== 화면 회전(가로 보기) ===== */
+  body.rs-rot{overflow:hidden}
+  body.rs-rot #modal{padding:0}
+  body.rs-rot .modal{position:fixed;top:50%;left:50%;width:100vh;height:100vw;width:100dvh;height:100dvw;max-width:none;max-height:none;border-radius:0;padding:14px 16px;overflow-y:auto;transform:translate(-50%,-50%) rotate(90deg);transform-origin:center center}
+  body.rs-rot #alertLayer .modal{position:static;width:100%;height:auto;max-width:400px;transform:none;border-radius:16px;padding:22px}
+  body.rs-rot .toast,body.rs-rot .toast.show{top:50%;bottom:auto;left:auto;right:26px;transform:translateY(-50%) rotate(90deg)}
+  body.rs-rot #alertLayer{top:50%;left:50%;right:auto;bottom:auto;width:100vh;height:100vw;width:100dvh;height:100dvw;transform:translate(-50%,-50%) rotate(90deg)}
+
+  /* ===== 선수 스탯 ===== */
+  .ps-tbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .ps-note{font-size:.8rem;color:var(--label);margin-bottom:9px;line-height:1.55}
+  .ps-tbl{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-size:.82rem}
+  .ps-tbl th,.ps-tbl td{border-right:1px solid #e4e0d9;border-bottom:1px solid #e4e0d9;padding:6px 7px;text-align:center;white-space:nowrap}
+  .ps-tbl th{background:var(--green);color:#fff;font-size:.68rem;font-weight:700;line-height:1.2;position:sticky;top:0;z-index:2}
+  .ps-tbl .ps-name{position:sticky;left:0;z-index:3;background:#fff;text-align:left;min-width:82px;border-right:2px solid #c9c3ba;font-weight:700}
+  .ps-tbl thead .ps-name{z-index:5;background:var(--green)}
+  .ps-tbl tbody tr:nth-child(even) td{background:#faf9f7}
+  .ps-tbl tbody tr:nth-child(even) .ps-name{background:#faf9f7}
+  .ps-tbl .ps-nb{background:none;border:none;font-family:inherit;font-size:.83rem;font-weight:700;color:var(--green);cursor:pointer;padding:0;text-decoration:underline}
+  .ps-tbl .ps-pts{background:#fff9e3;font-weight:800;color:#8a6a00}
+  .ps-tbl .ps-none{color:#a8a29a;font-size:.82rem;text-align:left;padding-left:12px;background:#f7f6f3}
+  .ps-tbl tfoot td{background:#efece5;font-weight:800}
+  .ps-tbl td.ps-top,.ps-tbl tbody tr:nth-child(even) td.ps-top{background:#cfe8cf;color:#1d5620;font-weight:800;box-shadow:inset 0 0 0 1px #9cc79c}
+  .ps-tbl td.ps-bad,.ps-tbl tbody tr:nth-child(even) td.ps-bad{background:#f8dad5;color:#933024;font-weight:800;box-shadow:inset 0 0 0 1px #e5b0a8}
+  .ps-note .ps-top{background:#cfe8cf;color:#1d5620;font-weight:800}
+  .ps-note .ps-bad{background:#f8dad5;color:#933024;font-weight:800}
+  .ps-wl{font-size:.72rem;color:#8a857d;font-weight:600}
+  .ps-chiprow{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 14px}
+  .ps-chip{background:var(--green-light);border:1px solid #b9d4b9;color:var(--green);border-radius:100px;padding:4px 11px;font-size:.8rem;font-weight:600}
+  .ps-gtitle{display:inline-block;padding:5px 13px;border-radius:8px;font-size:.85rem;font-weight:800;margin:16px 0 7px}
+  .ps-calhd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .ps-calhd span{font-size:1rem;font-weight:700}
+  .ps-calhd button{width:36px;height:36px;border:1.5px solid var(--border);background:#fff;border-radius:9px;font-size:1.1rem;cursor:pointer;font-family:inherit;color:var(--green)}
+  .ps-cwd,.ps-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+  .ps-cwd div{text-align:center;font-size:.72rem;font-weight:700;color:var(--label);padding:4px 0}
+  .ps-cwd div:first-child{color:#c0392b}
+  .ps-cd{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:.85rem;border-radius:8px;color:#c4bfb7}
+  .ps-cd.has{background:var(--green);color:#fff;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(44,95,46,.28)}
+  .ps-cd.has:hover{background:var(--green-mid)}
+  .ps-cd.empty{visibility:hidden}
+  .ps-hint{font-size:.78rem;color:var(--label);text-align:center;margin-top:10px}
+  /* 기록지 캘린더: 기록 없는 날짜도 고를 수 있다 */
+  .ps-cal.pick .ps-cd{color:var(--text);cursor:pointer}
+  .ps-cal.pick .ps-cd:hover{background:#e8f4e8}
+  .ps-cal .ps-cd.off{opacity:.28;cursor:default}
+  .ps-cal.pick .ps-cd.off:hover{background:none}
+  .ps-cal .ps-cd.sel{outline:2px solid var(--green);outline-offset:-2px;font-weight:800}
+
+  /* 작성되는 날짜 */
+  .rs-dateline{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:var(--green-light);border:1.5px solid #c6ddc6;border-radius:11px;padding:11px 14px;margin-bottom:14px}
+  .rs-dateline .dl-lbl{font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5c7a5c}
+  .rs-dateline .dl-date{font-size:1.06rem;font-weight:800;color:var(--green)}
+  .rs-dateline .dl-day{font-size:.82rem;font-weight:700;color:var(--green);background:#fff;border:1px solid #b9d4b9;border-radius:100px;padding:2px 10px}
 
   @media(max-width:480px){
     .card-header,.card-body{padding-left:22px;padding-right:22px}
@@ -184,6 +360,8 @@
 <div class="top-bar">
   <button class="top-btn" id="statusBtn">📊 참가 현황</button>
   <button class="top-btn" id="teamBtn">🏀 팀 생성기</button>
+  <button class="top-btn" id="sheetBtn">📝 기록지</button>
+  <button class="top-btn" id="playerStatBtn">📈 선수 스탯</button>
   <button class="top-btn" id="adminBtn">⚙️ 관리자</button>
 </div>
 
@@ -195,6 +373,8 @@
   </div>
 
   <div class="card-body" id="formWrapper">
+
+    <div class="att-summary" id="attSummary"><span class="sk sk-line"></span></div>
 
     <div class="notice-box" id="noticeBox">
       <div class="notice-label">📢 공지사항</div>
@@ -221,7 +401,7 @@
 
       <div class="field" id="field-days">
         <label class="main-label">참석 가능일 <span class="required">*</span></label>
-        <div id="daysContainer"></div>
+        <div id="daysContainer"><div class="sk sk-block"></div><div class="sk sk-block"></div></div>
         <div class="error-msg">참석 가능일을 선택해 주세요.</div>
       </div>
 
@@ -247,26 +427,11 @@
 
 <div class="toast" id="toast"></div>
 <div class="modal-backdrop" id="modal"><div class="modal" id="modalBox"></div></div>
+<div class="modal-backdrop" id="alertLayer"><div class="modal" id="alertBox"></div></div>
 
 <script>
-// ⚙️ 설정: SCRIPT_URL 을 본인 Apps Script 웹앱 주소로 바꾸세요
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzMIHc-An1WwdWQdRnUe13KYk-VWOivULbh4uRaVdxze_--0l0g-PhZu_su89ssjE0d/exec";
-
-/* ===== JSONP ===== */
-function fetchJsonp(url, payload){
-  return new Promise((resolve,reject)=>{
-    const cb='__jcb_'+Date.now()+'_'+Math.floor(Math.random()*1e6);
-    const script=document.createElement('script');
-    const timer=setTimeout(()=>{cleanup();reject(new Error('시간 초과'))},20000);
-    window[cb]=(d)=>{clearTimeout(timer);cleanup();resolve(d)};
-    function cleanup(){delete window[cb];if(script.parentNode)script.parentNode.removeChild(script)}
-    let full=url+(url.includes('?')?'&':'?')+'callback='+cb;
-    if(payload){full+='&payload='+encodeURIComponent(JSON.stringify(payload))}
-    script.src=full;
-    script.onerror=()=>{clearTimeout(timer);cleanup();reject(new Error('요청 실패'))};
-    document.head.appendChild(script);
-  });
-}
+// ⚙️ SCRIPT_URL 과 fetchJsonp 는 <head> 최상단 스크립트에 정의되어 있습니다
+//    (초기 데이터 요청을 CSS/폰트 로딩과 병렬로 먼저 시작하기 위함)
 
 /* ===== 상태 ===== */
 let currentMember=null;
@@ -276,6 +441,8 @@ let currentDays=[];        // [{id,title,desc}]
 let currentAttendance=[];
 let currentMembers=[];
 let adminPw='';
+let _statusOpen=false;     // 참가 현황 모달이 열려 있는지 (백그라운드 갱신 후 재렌더 판단용)
+let _lastStatusHtml='';    // 동일 내용 재렌더 방지
 
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 
@@ -285,27 +452,61 @@ function toast(msg,type='success'){
   t.className='toast '+type+' show';
   setTimeout(()=>t.classList.remove('show'),2800);
 }
-function openModal(html){
-  document.getElementById('modalBox').innerHTML=html;
+function openModal(html,wide){
+  _statusOpen=false;
+  const box=document.getElementById('modalBox');
+  box.className='modal'+(wide?' wide':'');   // 이전 모달의 상태 클래스(rs-minus 등)까지 초기화
+  box.innerHTML=html;
   document.getElementById('modal').classList.add('show');
 }
-function closeModal(){document.getElementById('modal').classList.remove('show')}
+function closeModal(){
+  _statusOpen=false;
+  if(typeof rsRotOff==='function')rsRotOff();   // 가로 보기 상태로 남지 않도록
+  document.getElementById('modal').classList.remove('show');
+}
 document.getElementById('modal').addEventListener('click',(e)=>{if(e.target.id==='modal')closeModal()});
+document.getElementById('alertLayer').addEventListener('click',(e)=>{if(e.target.id==='alertLayer')closePopup()});
 
-/* ===== 초기 로드 ===== */
-async function loadInit(){
+/* ===== 초기 로드 (stale-while-revalidate) =====
+   1) localStorage 캐시가 있으면 즉시 화면을 그린다 (네트워크 대기 0ms)
+   2) 동시에 서버 최신 데이터를 받아 조용히 갱신한다 */
+const CACHE_KEY='komodo_init_v1';
+let dataReady=false;      // 한 번이라도 렌더된 적이 있는지 (캐시 포함)
+let dataFresh=false;      // 이번 접속에서 서버 응답을 실제로 받았는지
+let _initInflight=null;
+
+function readCache(){
   try{
-    const r=await fetchJsonp(SCRIPT_URL,{action:'init'});
-    if(r.ok){
-      noticeText=r.notice||'';
-      currentDays=r.days||[];
-      currentAttendance=r.attendance||[];
-      currentMembers=r.members||[];
-      renderNotice();
-      renderComments();
-      renderDays();
-    }
-  }catch(e){console.warn('init 실패',e)}
+    const raw=localStorage.getItem(CACHE_KEY);
+    if(!raw)return null;
+    const o=JSON.parse(raw);
+    return (o&&o.data&&o.data.ok)?o.data:null;
+  }catch(e){return null}
+}
+function writeCache(data){
+  try{localStorage.setItem(CACHE_KEY,JSON.stringify({t:Date.now(),data}))}catch(e){}
+}
+function applyInit(r){
+  noticeText=r.notice||'';
+  currentDays=r.days||[];
+  currentAttendance=r.attendance||[];
+  currentMembers=r.members||[];
+  dataReady=true;
+  renderNotice();
+  renderComments();
+  renderDays();
+  renderAttSummary();
+}
+/* 서버 최신 데이터를 가져와 반영. 중복 호출은 진행 중인 요청에 합류한다. */
+function loadInit(pending){
+  if(_initInflight)return _initInflight;
+  const req=pending||fetchJsonp(SCRIPT_URL,{action:'init'});
+  _initInflight=Promise.resolve(req).then(r=>{
+    if(r&&r.ok){dataFresh=true;applyInit(r);writeCache(r)}
+    return r;
+  }).catch(e=>{console.warn('init 실패',e);return null})
+   .finally(()=>{_initInflight=null});
+  return _initInflight;
 }
 function renderNotice(){
   const el=document.getElementById('noticeContent');
@@ -323,8 +524,21 @@ function renderComments(){
   list.innerHTML=html||'<span class="comment-empty">아직 남긴 한마디가 없습니다.</span>';
 }
 let _daysContainerBound=false;
+let _daysSig='';
+// 현재 체크된 항목(요일 제목 / '모두 불참')을 수집
+function getCheckedDayTitles(){
+  const out=[];
+  document.querySelectorAll('#daysContainer input[type="checkbox"]').forEach(cb=>{if(cb.checked)out.push(cb.value)});
+  return out;
+}
 function renderDays(){
   const c=document.getElementById('daysContainer');
+  if(!c)return;
+  // 백그라운드 갱신으로 요일 구성이 그대로면 다시 그리지 않는다
+  // (다시 그리면 사용자가 체크해 둔 항목이 초기화됨)
+  const sig=JSON.stringify(currentDays);
+  if(sig===_daysSig&&c.querySelector('input[type="checkbox"]'))return;
+  const keep=getCheckedDayTitles();   // 구성이 바뀐 경우에도 선택은 최대한 보존
   const blocks=currentDays.map((d)=>
     '<div class="day-block" data-day="'+esc(d.id)+'" id="block-'+esc(d.id)+'">'+
       '<div class="day-block-top">'+
@@ -343,8 +557,9 @@ function renderDays(){
       '<div class="day-desc">이번 주는 참석이 어려워요.</div>'+
     '</div>';
   c.innerHTML=blocks+noneBlock;
+  _daysSig=sig;
   attachDayEvents();
-  updateDayBlocks();
+  if(keep.length)fillDays(keep); else updateDayBlocks();
 }
 function attachDayEvents(){
   if(_daysContainerBound)return;
@@ -384,13 +599,26 @@ function handleDayChange(cb){
 document.getElementById('checkBtn').addEventListener('click',checkName);
 document.getElementById('name').addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();checkName()}});
 
+// 회원 명단은 init 으로 이미 받아둔 상태이므로 서버 왕복 없이 즉시 조회한다
+function lookupMemberLocal(name){
+  const m=currentMembers.find(x=>String(x.name||'').trim()===name);
+  if(!m)return {ok:false,message:'명단에 없는 이름입니다'};
+  const a=currentAttendance.find(x=>String(x.name||'').trim()===name);
+  return {ok:true,member:m,prevAttendance:a?{days:a.days||[],comment:a.comment||''}:null};
+}
 async function checkName(){
   const name=document.getElementById('name').value.trim();
   if(!name){toast('이름을 입력하세요','error');return}
   const btn=document.getElementById('checkBtn');
   btn.disabled=true;btn.textContent='확인중...';
   try{
-    const r=await fetchJsonp(SCRIPT_URL,{action:'checkMember',name});
+    // 진행 중인 갱신이 있으면 먼저 기다린다.
+    // (localStorage 캐시는 주간 초기화 전 데이터일 수 있어 '이전 투표 기록'을 잘못 띄울 수 있음)
+    if(_initInflight){try{await _initInflight}catch(e){}}
+    // 이번 접속에서 서버 응답을 받았을 때만 로컬 조회(0ms), 아니면 서버에 직접 확인
+    const r=dataFresh
+      ? lookupMemberLocal(name)
+      : await fetchJsonp(SCRIPT_URL,{action:'checkMember',name});
     if(!r.ok){
       document.getElementById('memberInfo').classList.remove('show');
       document.getElementById('prevVote').classList.remove('show');
@@ -478,6 +706,7 @@ document.getElementById('surveyForm').addEventListener('submit',async(e)=>{
       document.getElementById('successScreen').classList.add('show');
       document.getElementById('successMsg').textContent=prevAttendance?'이전 기록이 수정되었습니다.':'참석 정보가 저장되었습니다.';
       toast('저장 완료','success');
+      loadInit();   // 방금 제출한 내용으로 캐시 갱신 (백그라운드)
     }else{toast(r.message||'저장 실패','error')}
   }catch(err){console.error(err);toast('통신 실패','error')}
   finally{
@@ -496,6 +725,7 @@ function confirmModal(msg){
 
 document.getElementById('resetBtn').addEventListener('click',()=>{
   document.getElementById('surveyForm').reset();
+  updateDayBlocks();   // reset() 은 체크만 풀고 .checked 강조는 남으므로 직접 갱신
   const ci=document.getElementById('commentInput');if(ci)ci.value='';
   document.getElementById('memberInfo').classList.remove('show');
   document.getElementById('prevVote').classList.remove('show');
@@ -602,9 +832,16 @@ async function admResetPage(){
 }
 
 /* ===== 참가 현황 ===== */
-document.getElementById('statusBtn').addEventListener('click',async()=>{
-  openModal('<h3>📊 참가 인원 현황</h3><p style="text-align:center;color:#888;padding:30px 0">불러오는 중...</p>');
-  await loadInit();
+document.getElementById('statusBtn').addEventListener('click',()=>{
+  // 캐시된 데이터가 있으면 즉시 렌더 후 백그라운드로 최신화
+  if(dataReady)renderStatusModal();
+  else{
+    openModal('<h3>📊 참가 인원 현황</h3><p style="text-align:center;color:#888;padding:30px 0">불러오는 중...</p>');
+    _statusOpen=true;
+  }
+  loadInit().then(()=>{if(_statusOpen)renderStatusModal()});
+});
+function renderStatusModal(){
   const noticeBody=noticeText.trim()
     ?'<div class="notice-content">'+esc(noticeText)+'</div>'
     :'<div class="notice-content"><span class="notice-empty">공지사항이 없습니다.</span></div>';
@@ -642,16 +879,29 @@ document.getElementById('statusBtn').addEventListener('click',async()=>{
     '<div class="status-row"><span><span class="tag tag-none">미투표</span>'+noneAll.length+'명</span></div>'+
     '<div class="status-names">'+(noneAll.map(esc).join(', ')||'-')+'</div>'+
     '</div>';
-  openModal('<h3>📊 참가 인원 현황</h3>'+noticeSection+commentSection+sections+noneSection+'<div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">닫기</button></div>');
-});
+  const html='<h3>📊 참가 인원 현황</h3>'+noticeSection+commentSection+sections+noneSection+
+    '<div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">닫기</button></div>';
+  // 백그라운드 갱신 결과가 동일하면 다시 그리지 않는다 (스크롤 위치 유지)
+  if(_statusOpen&&_lastStatusHtml===html)return;
+  _lastStatusHtml=html;
+  openModal(html);
+  _statusOpen=true;
+}
 
 /* ===== 팀 생성기 ===== */
 let tgDay='',tgMode='num',tgNumTeams=2,tgTeams=[],tgPool=[];
 let tgSameConstraints=[],tgDiffConstraints=[],tgExcluded=new Set();
+let tgSavedDate='';   // 불러온 저장분을 수정 중이면 그 날짜 (재저장 시 이 날짜를 덮어씀)
 
 document.getElementById('teamBtn').addEventListener('click',async()=>{
-  openModal('<h3>🏀 팀 생성기</h3><p style="text-align:center;color:#888;padding:30px 0">불러오는 중...</p>');
-  await loadInit();
+  // 캐시된 데이터가 있으면 기다리지 않고 바로 연다
+  if(!dataReady){
+    openModal('<h3>🏀 팀 생성기</h3><p style="text-align:center;color:#888;padding:30px 0">불러오는 중...</p>');
+    await loadInit();
+  }else{
+    // 배정 작업 중 화면이 튀지 않도록, 최신 데이터는 조용히 갱신만 한다
+    loadInit();
+  }
   if(currentDays.length>0&&!currentDays.some(d=>d.title===tgDay))tgDay=currentDays[0].title;
   tgTeams=[];tgPool=[];
   renderTeamGenerator();
@@ -682,12 +932,13 @@ function renderTeamGenerator(){
     '<div class="modal-actions">'+
       '<button class="btn-primary" onclick="tgBuild()">수동 배정</button>'+
       '<button class="btn-primary" onclick="tgRandom()">🎲 랜덤 배정</button>'+
+      '<button class="btn-secondary" onclick="tgLoadSaved()">저장된 팀<br>불러오기</button>'+
     '</div>'+
     '<div id="tgResult"></div>'
   );
   renderTeamResult();
 }
-function tgSetDay(d){tgDay=d;renderTeamGenerator()}
+function tgSetDay(d){tgDay=d;tgSavedDate='';renderTeamGenerator()}
 function tgSetComposition(mode,n){
   tgMode=mode;
   if(mode==='ybob')tgNumTeams=2;else tgNumTeams=n;
@@ -708,6 +959,7 @@ function collectGuests(){
   return guests;
 }
 function tgBuild(){
+  tgSavedDate='';
   const attendees=getAttendees(tgDay);
   const guests=collectGuests();
   if(tgMode==='ybob'){
@@ -726,6 +978,7 @@ function tgBuild(){
   renderTeamResult();
 }
 function tgRandom(){
+  tgSavedDate='';
   const attendees=getAttendees(tgDay);
   const guests=collectGuests();
   if(attendees.length===0&&guests.length===0){toast(tgDay+' 참석자가 없습니다','error');return}
@@ -855,7 +1108,12 @@ function renderTeamResult(){
   const hasTeams=tgTeams.some(t=>t.length>0);
   const copyHtml=hasTeams?
     '<div class="copy-box"><pre id="tgCopyText">'+esc(tgCopyText())+'</pre>'+
-    '<button class="btn-copy" onclick="tgDoCopy()">📋 복사하기</button></div>':'';
+    '<button class="btn-copy" onclick="tgDoCopy()">📋 복사하기</button> '+
+    '<button class="btn-copy" id="tgSaveBtn" style="background:#1565c0" onclick="tgSaveTeams()">💾 팀 저장</button>'+
+    '<div style="font-size:.75rem;color:#4a7a4a;margin-top:8px;line-height:1.5">'+
+    '저장 대상: <b>'+esc(tgTargetDate())+'</b> · '+esc(tgDay)+
+    (tgSavedDate?' (불러온 내용을 수정합니다)':'')+'<br>'+
+    '저장하면 📝 기록지 메뉴에서 이 팀을 그대로 불러올 수 있습니다.</div></div>':'';
 
   // 분배 조건 (팀 배정과 대기 사이)
   const rtAll=[...getAttendees(tgDay),...collectGuests()];
@@ -973,8 +1231,1344 @@ function tgConfirmGuest(){
   renderTeamGenerator();
 }
 
-/* 시작 */
-loadInit();
+/* =========================================================
+ *  공통 유틸 (날짜 / 팝업)
+ * ========================================================= */
+
+/* onclick="..." 속성 안에 넣을 문자열용 이스케이프.
+   따옴표는 JS 문자열로, 나머지는 HTML 속성으로 안전하게 만든다. */
+function jsq(s){
+  return String(s==null?'':s)
+    .replace(/\\/g,'\\\\').replace(/'/g,"\\'")
+    .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+const KOR_WD={'일':0,'월':1,'화':2,'수':3,'목':4,'금':5,'토':6};
+const WD_NAMES=['일','월','화','수','목','금','토'];
+
+/* 기기 시간대와 무관하게 한국 시각 기준으로 계산한다
+   (해외/시간대 오설정 기기에서 요일 판정이 틀어지지 않도록) */
+function kstNow(){
+  const d=new Date();
+  return new Date(d.getTime()+d.getTimezoneOffset()*60000+9*3600000);
+}
+function fmtDate(d){
+  const p=(n)=>('0'+n).slice(-2);
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function parseDate(s){
+  const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m?new Date(+m[1],+m[2]-1,+m[3]):null;
+}
+function dayWeekday(title){
+  const m=String(title||'').match(/([일월화수목금토])\s*요일/);
+  return m?KOR_WD[m[1]]:-1;
+}
+/* 참석 데이터는 매주 월요일 06:00 에 초기화되므로(weeklyAutoReset)
+   "이번 주"의 기준도 월요일 06:00 로 맞춘다. */
+function weekStart(now){
+  const cur=now.getDay();
+  const mon=new Date(now);
+  mon.setDate(now.getDate()+(cur===0?-6:1-cur));
+  mon.setHours(6,0,0,0);
+  if(now<mon)mon.setDate(mon.getDate()-7);
+  return mon;
+}
+/* 이번 주 안에서 해당 요일의 실제 날짜 */
+function dayDateInWeek(title,now){
+  const n=now||kstNow();
+  const wd=dayWeekday(title);
+  if(wd<0){const d=new Date(n);d.setHours(0,0,0,0);return d}
+  const mon=weekStart(n);
+  const d=new Date(mon);
+  d.setDate(mon.getDate()+((wd===0?7:wd)-1));
+  d.setHours(0,0,0,0);
+  return d;
+}
+/* 그 날 경기가 이미 끝났는지 (22:00 기준) */
+function isDayPassed(title){
+  if(dayWeekday(title)<0)return false;
+  const now=kstNow();
+  const d=dayDateInWeek(title,now);
+  d.setHours(22,0,0,0);
+  return now>d;
+}
+
+/* ===== 팝업 레이어 (모달 위에 겹쳐 뜬다) ===== */
+let _popCb=null;
+function popupHtml(html,cb){
+  const box=document.getElementById('alertBox');
+  if(!box)return;
+  box.innerHTML=html;
+  document.getElementById('alertLayer').classList.add('show');
+  _popCb=cb||null;
+}
+function popupMsg(msg,cb){
+  popupHtml('<p class="pop-msg">'+esc(msg)+'</p>'+
+    '<div class="modal-actions"><button class="btn-primary" onclick="closePopup()">확인</button></div>',cb);
+}
+function closePopup(){
+  document.getElementById('alertLayer').classList.remove('show');
+  const c=_popCb;_popCb=null;
+  if(c)c();
+}
+
+/* =========================================================
+ *  1. 참석자 현황 한 줄 요약
+ * ========================================================= */
+function renderAttSummary(){
+  const el=document.getElementById('attSummary');
+  if(!el)return;
+  if(!currentDays.length){
+    el.innerHTML='<span class="as-empty">참석 가능일이 설정되지 않았습니다.</span>';
+    return;
+  }
+  el.innerHTML=currentDays.map(d=>{
+    const n=currentAttendance.filter(a=>(a.days||[]).indexOf(d.title)>=0).length;
+    // 경기가 끝난 요일은 회색 + 취소선
+    return '<span class="as-item'+(isDayPassed(d.title)?' past':'')+'">'+
+      esc(d.title)+' 참석자 현재 <b>'+n+'</b>명</span>';
+  }).join('');
+}
+
+/* =========================================================
+ *  2. 기록지 입력
+ * ========================================================= */
+
+/* 스탯 13종. 순서는 서버 STAT_HEADERS 와 반드시 같아야 한다. */
+const RS_KEYS=['p2m','p2a','p3m','p3a','ftm','fta','reb','ast','stl','blk','tov','pf','bc'];
+const RS_ATT ={p2m:'p2a',p3m:'p3a',ftm:'fta'};   // 성공 → 짝이 되는 시도
+const RS_MADE={p2a:'p2m',p3a:'p3m',fta:'ftm'};   // 시도 → 짝이 되는 성공
+
+/* 표에 보이는 열 순서 (파생 열 포함) */
+const RS_VIEW=[
+  {t:'pts',code:'PTS',ko:'득점'},
+  {t:'s',k:'p2m',code:'2PM',ko:'2점<br>성공'},
+  {t:'s',k:'p2a',code:'2PA',ko:'2점<br>시도'},
+  {t:'pct',m:'p2m',a:'p2a',code:'2P%',ko:'2점<br>성공률'},
+  {t:'s',k:'p3m',code:'3PM',ko:'3점<br>성공'},
+  {t:'s',k:'p3a',code:'3PA',ko:'3점<br>시도'},
+  {t:'pct',m:'p3m',a:'p3a',code:'3P%',ko:'3점<br>성공률'},
+  {t:'s',k:'bc',code:'BC',ko:'바스켓<br>카운트'},
+  {t:'s',k:'ftm',code:'FTM',ko:'자유투<br>성공'},
+  {t:'s',k:'fta',code:'FTA',ko:'자유투<br>시도'},
+  {t:'pct',m:'ftm',a:'fta',code:'FT%',ko:'자유투<br>성공률'},
+  {t:'s',k:'reb',code:'REB',ko:'리바<br>운드'},
+  {t:'s',k:'ast',code:'AST',ko:'어시<br>스트'},
+  {t:'s',k:'stl',code:'STL',ko:'스틸'},
+  {t:'s',k:'blk',code:'BLK',ko:'블락'},
+  {t:'s',k:'tov',code:'TO',ko:'턴오버'},
+  {t:'s',k:'pf',code:'PF',ko:'반칙'}
+];
+
+const RS_PRESET=[
+  {n:'검정',c:'#1a1a1a'},{n:'흰색',c:'#ffffff'},{n:'주황',c:'#f57c00'},{n:'파랑',c:'#1565c0'},
+  {n:'빨강',c:'#c62828'},{n:'노랑',c:'#f7d117'},{n:'초록',c:'#2e7d32'},{n:'회색',c:'#8d8d8d'}
+];
+// 팀별 기본 유니폼색 (첨부 기록지 순서: 검정 → 주황 → 흰색 → 파랑)
+const RS_DEFAULT_COLORS=['#1a1a1a','#f57c00','#ffffff','#1565c0'];
+function rsDefaultColor(i){return RS_DEFAULT_COLORS[i%RS_DEFAULT_COLORS.length]}
+const RS_DRAFT_KEY='komodo_rs_v1';
+
+let rsDate='',rsDay='',rsTeams=[],rsGame=1,rsMatch=[0,1],rsTab=0,rsMode=1;
+let rsStats={},rsHist=[],rsBusy=false;
+let rsPast=false,rsLoadedFrom='',rsView='setup',rsWideMode=null;
+let rsMarks={},rsCalY=0,rsCalM=0;   // 지난 경기 캘린더
+let rsRotOn=false,rsRotNative=false;
+
+function rsBlank(){const o={};RS_KEYS.forEach(k=>o[k]=0);return o}
+function rsGet(name){if(!rsStats[name])rsStats[name]=rsBlank();return rsStats[name]}
+function rsPts(s){return (s.p2m||0)*2+(s.p3m||0)*3+(s.ftm||0)}
+function rsPct(m,a){return a>0?Math.round(m/a*100)+'%':'-'}
+/* 배경색 밝기에 따라 글자색을 검정/흰색으로 자동 선택 */
+function rsFg(hex){
+  const h=String(hex||'').replace('#','');
+  if(h.length<6)return '#ffffff';
+  const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+  if(isNaN(r)||isNaN(g)||isNaN(b))return '#ffffff';
+  return (0.299*r+0.587*g+0.114*b)>150?'#1a1a1a':'#ffffff';
+}
+function rsTeamAt(i){return rsTeams[i]||null}
+
+/* ===== 임시 저장 (새로고침·화면 꺼짐 대비) ===== */
+function rsSaveDraft(){
+  try{
+    localStorage.setItem(RS_DRAFT_KEY,JSON.stringify({
+      date:rsDate,day:rsDay,teams:rsTeams,game:rsGame,match:rsMatch,stats:rsStats,t:Date.now()
+    }));
+  }catch(e){}
+}
+function rsReadDraft(){
+  try{
+    const o=JSON.parse(localStorage.getItem(RS_DRAFT_KEY)||'null');
+    return (o&&o.teams&&o.teams.length)?o:null;
+  }catch(e){return null}
+}
+function rsClearDraft(){try{localStorage.removeItem(RS_DRAFT_KEY)}catch(e){}}
+/* 실제로 입력한 기록이 하나라도 있는 임시저장인지 */
+function rsDraftHasInput(d){
+  const s=(d&&d.stats)||{};
+  return Object.keys(s).some(n=>RS_KEYS.some(k=>(s[n][k]||0)>0));
+}
+
+/* ===== 진입 ===== */
+document.getElementById('sheetBtn').addEventListener('click',()=>{
+  if(!rsDay&&currentDays.length)rsDay=currentDays[0].title;
+  if(!rsDate)rsDate=fmtDate(dayDateInWeek(rsDay));
+  const d=rsReadDraft();
+  if(d&&!rsTeams.length&&!rsDraftHasInput(d)){
+    // 입력한 기록이 없는 임시저장이면 굳이 묻지 않고 팀·날짜만 이어받는다
+    rsDate=d.date||rsDate;rsDay=d.day||rsDay;rsTeams=d.teams||[];
+    rsGame=d.game||1;rsMatch=d.match||[0,1];rsStats=d.stats||{};
+    rsRenderSetup();
+  }else if(d&&!rsTeams.length){
+    rsRenderSetup();
+    popupHtml('<h3>이어서 입력할까요?</h3>'+
+      '<p class="pop-msg">저장하지 않은 기록이 남아 있습니다.\n'+
+      esc(d.date+' '+d.day+' '+d.game+'게임')+'</p>'+
+      '<div class="modal-actions">'+
+      '<button class="btn-secondary" onclick="rsDropDraft()">새로 시작</button>'+
+      '<button class="btn-primary" onclick="rsResumeDraft()">이어서 입력</button></div>');
+  }else{
+    rsRenderSetup();
+  }
+});
+function rsResumeDraft(){
+  const d=rsReadDraft();
+  closePopup();
+  if(!d)return;
+  rsDate=d.date;rsDay=d.day;rsTeams=d.teams;rsGame=d.game||1;
+  rsMatch=d.match||[0,1];rsStats=d.stats||{};rsHist=[];
+  rsRenderSetup();
+}
+function rsDropDraft(){rsClearDraft();closePopup();rsRenderSetup()}
+
+/* ===== 설정 화면 (진행일·날짜 선택 → 팀 불러오기 → 대결 선택) ===== */
+function rsIsWide(){return window.innerWidth>=900}
+/* 기록지 상단 '작성되는 날짜' 줄 */
+function rsDateLineHtml(){
+  return '<div class="rs-dateline">'+
+    '<span class="dl-lbl">작성되는 날짜</span>'+
+    '<span class="dl-date">'+esc(rsDate||'-')+'</span>'+
+    (rsDay?'<span class="dl-day">'+esc(rsDay)+'</span>':'')+
+    '</div>';
+}
+
+function rsRenderSetup(){
+  rsView='setup';
+  const dayBtns=currentDays.map(d=>
+    '<button class="tg-btn'+(!rsPast&&rsDay===d.title?' active':'')+'" onclick="rsPickDay(\''+jsq(d.title)+'\')">'+esc(d.title)+'</button>'
+  ).join('')||'<span style="font-size:.85rem;color:#aaa">진행일이 설정되지 않았습니다</span>';
+  const pastBtn='<button class="tg-btn'+(rsPast?' active':'')+'" onclick="rsPastDialog()">📅 지난 경기 입력</button>';
+
+  const emptyPast=(rsPast&&rsTeams.length&&!rsTeams.some(t=>t.members.length))
+    ? '<div class="rs-warn">이 날짜로 저장된 팀이 없습니다. 아래에서 팀을 직접 입력해 주세요.</div>'
+    : '';
+  const fromNotice=rsLoadedFrom
+    ? '<div class="rs-warn" style="margin-top:10px">'+esc(rsDate)+' 로 저장된 팀이 없어 '+
+      '<b>'+esc(rsLoadedFrom)+'</b> 배정을 대신 불러왔습니다.<br>'+
+      '기록은 <b>'+esc(rsDate)+'</b> 로 저장됩니다.</div>'
+    : '';
+
+  let teamsHtml='';
+  if(rsTeams.length){
+    const posTag=(p)=>'<span class="pos">'+({가드:'G',포워드:'F',센터:'C'}[p]||'-')+'</span>';
+    teamsHtml=rsTeams.map((t,i)=>
+      '<div class="rs-card">'+
+        '<h5><span class="rs-chip" style="background:#eee;color:#444">'+esc(t.label)+'팀</span>'+
+        '<span style="font-weight:600;color:#777;font-size:.82rem">'+t.members.length+'명</span>'+
+        '<button class="rs-mini" onclick="rsSetupAdd('+i+')">＋ 선수</button>'+
+        (rsTeams.length>2?'<button class="rs-mini del" onclick="rsRemoveTeam('+i+')" title="팀 제거">팀 제거</button>':'')+
+        '</h5>'+
+        '<div class="rs-plist">'+
+        (t.members.map((m,mi)=>
+          '<span class="rs-pchip">'+posTag(m.position)+esc(m.name)+
+          '<button onclick="rsSetupDel('+i+','+mi+')" title="빼기">✕</button></span>').join('')
+          ||'<span class="rs-empty">＋ 선수 를 눌러 명단을 입력하세요</span>')+
+        '</div>'+
+      '</div>'
+    ).join('');
+
+    // 대결 조합 버튼
+    const pairs=[];
+    for(let i=0;i<rsTeams.length;i++)for(let j=i+1;j<rsTeams.length;j++)pairs.push([i,j]);
+    const pairBtns=pairs.map(p=>{
+      const on=(rsMatch[0]===p[0]&&rsMatch[1]===p[1]);
+      return '<button class="tg-btn'+(on?' active':'')+'" onclick="rsSetMatch('+p[0]+','+p[1]+')">'+
+        esc(rsTeams[p[0]].label)+' vs '+esc(rsTeams[p[1]].label)+'</button>';
+    }).join('');
+
+    teamsHtml+=
+      '<div class="tg-field" style="margin-top:14px"><label>대결 팀</label><div class="tg-btn-row">'+
+      (pairBtns||'<span style="font-size:.85rem;color:#aaa">팀이 2개 이상이어야 합니다</span>')+'</div></div>'+
+      '<div class="tg-field"><label>게임 번호</label><div class="rs-inline">'+
+      '<input type="number" min="1" max="99" value="'+rsGame+'" onchange="rsSetGame(this.value)" style="width:90px" />'+
+      '<span style="font-size:.8rem;color:#888">같은 날짜·같은 게임 번호로 저장하면 기존 기록을 덮어씁니다</span></div></div>'+
+      '<p class="ps-note">유니폼색은 기록지를 시작한 뒤 <b>🎽 유니폼색</b> 버튼에서 게임마다 바꿀 수 있습니다.</p>'+
+      '<div class="modal-actions">'+
+      '<button class="btn-secondary" onclick="rsAddTeam()">+ 팀 추가</button>'+
+      '<button class="btn-primary" onclick="rsStart()">▶ 기록지 시작</button></div>';
+  }else{
+    teamsHtml=
+      '<div class="rs-warn">불러온 팀이 없습니다.<br>'+
+      '🏀 <b>팀 생성기</b>에서 팀을 배정한 뒤 하단 <b>💾 팀 저장</b> 버튼을 누르면 여기서 바로 불러올 수 있습니다.</div>'+
+      '<div class="modal-actions">'+
+      '<button class="btn-secondary" onclick="rsBlankTeams()">빈 팀으로 시작</button>'+
+      '<button class="btn-primary" onclick="closeModal();document.getElementById(\'teamBtn\').click()">팀 생성기 열기</button></div>';
+  }
+
+  openModal(
+    '<div class="rs-hd"><h3>📝 기록지 입력</h3></div>'+
+    rsDateLineHtml()+
+    '<div class="tg-field"><label>진행일 (누르면 저장된 팀을 불러옵니다)</label>'+
+    '<div class="tg-btn-row">'+dayBtns+pastBtn+'</div></div>'+
+    fromNotice+emptyPast+
+    '<div id="rsSetupBody">'+teamsHtml+'</div>'+
+    '<div style="text-align:center;margin-top:16px">'+
+    '<button class="rs-tool" onclick="closeModal()">닫기</button></div>',
+    true
+  );
+}
+/* 이번 주 해당 요일로 팀을 불러온다 */
+function rsPickDay(title){
+  rsPast=false;
+  rsDay=title;
+  rsDate=fmtDate(dayDateInWeek(title));
+  rsLoadTeams();
+}
+/* 지난 경기: 캘린더로 날짜를 고른 뒤 그 날의 팀을 불러온다.
+   저장된 팀이 없는 날짜도 고를 수 있고, 그 경우 빈 팀이 만들어져 바로 배정할 수 있다. */
+async function rsPastDialog(){
+  popupHtml('<p class="ld">저장된 경기를 불러오는 중...</p>');
+  const marks={};
+  try{
+    const r=await fetchJsonp(SCRIPT_URL,{action:'getTeams',day:''});
+    ((r&&r.dateList)||[]).forEach(x=>{marks[x[0]]=x[1]||''});
+  }catch(e){}
+  try{
+    const r2=await fetchJsonp(SCRIPT_URL,{action:'stats',mode:'dates'});
+    ((r2&&r2.dates)||[]).forEach(d=>{if(!(d in marks))marks[d]=''});
+  }catch(e){}
+  rsMarks=marks;
+  const base=parseDate(rsDate)||kstNow();
+  rsCalY=base.getFullYear();rsCalM=base.getMonth();
+  rsRenderPastCal();
+}
+function rsCalMove(d){
+  rsCalM+=d;
+  if(rsCalM<0){rsCalM=11;rsCalY--}
+  if(rsCalM>11){rsCalM=0;rsCalY++}
+  rsRenderPastCal();
+}
+function rsRenderPastCal(){
+  const today=fmtDate(kstNow());
+  const first=new Date(rsCalY,rsCalM,1).getDay();
+  const dim=new Date(rsCalY,rsCalM+1,0).getDate();
+  let cells='';
+  for(let i=0;i<first;i++)cells+='<div class="ps-cd empty"></div>';
+  for(let d=1;d<=dim;d++){
+    const ds=rsCalY+'-'+('0'+(rsCalM+1)).slice(-2)+'-'+('0'+d).slice(-2);
+    const future=ds>today;
+    const cls='ps-cd'+((ds in rsMarks)?' has':'')+(future?' off':'')+(ds===rsDate?' sel':'');
+    cells+='<div class="'+cls+'"'+(future?'':' onclick="rsPickPast(\''+ds+'\')"')+'>'+d+'</div>';
+  }
+  popupHtml(
+    '<h3>📅 지난 경기 입력</h3>'+
+    '<div class="ps-calhd"><button onclick="rsCalMove(-1)">‹</button>'+
+    '<span>'+rsCalY+'년 '+(rsCalM+1)+'월</span>'+
+    '<button onclick="rsCalMove(1)">›</button></div>'+
+    '<div class="ps-cwd">'+['일','월','화','수','목','금','토'].map(w=>'<div>'+w+'</div>').join('')+'</div>'+
+    '<div class="ps-cal pick">'+cells+'</div>'+
+    '<p class="ps-hint">초록색은 팀·기록이 저장된 날짜입니다.<br>다른 날짜를 골라도 바로 팀 배정을 할 수 있습니다.</p>'+
+    '<div class="modal-actions"><button class="btn-secondary" onclick="closePopup()">취소</button></div>');
+}
+/* 입력해 둔 기록이 있는지 */
+function rsHasInput(){
+  return Object.keys(rsStats).some(n=>RS_KEYS.some(k=>(rsStats[n][k]||0)>0));
+}
+function rsPickPast(date){
+  if(rsHasInput()){
+    popupHtml('<h3>입력 중인 기록이 있습니다</h3>'+
+      '<p class="pop-msg">다른 날짜로 시작하면 지금 입력한 기록은 사라집니다.\n계속할까요?</p>'+
+      '<div class="modal-actions">'+
+      '<button class="btn-secondary" onclick="rsPastDialog()">돌아가기</button>'+
+      '<button class="btn-danger" onclick="rsPickPastGo(\''+jsq(date)+'\')">새 날짜로 시작</button></div>');
+    return;
+  }
+  rsPickPastGo(date);
+}
+function rsPickPastGo(date){
+  closePopup();
+  rsStats={};rsHist=[];      // 날짜가 바뀌면 입력 중이던 기록은 비운다
+  rsPast=true;
+  rsDate=date;
+  const saved=rsMarks[date];
+  const d=parseDate(date);
+  if(saved){
+    rsDay=saved;
+  }else if(d){
+    // 저장 기록이 없으면 고른 날짜의 실제 요일을 진행일로 쓴다.
+    // (설정된 진행일과 같은 요일이면 그 제목을 그대로 사용)
+    const m=currentDays.find(x=>dayWeekday(x.title)===d.getDay());
+    rsDay=m?m.title:WD_NAMES[d.getDay()]+'요일';
+  }
+  rsLoadTeams();
+}
+
+async function rsLoadTeams(){
+  if(rsBusy)return;
+  rsBusy=true;
+  rsLoadedFrom='';
+  const body=document.getElementById('rsSetupBody');
+  if(body)body.innerHTML='<p class="ld">저장된 팀을 불러오는 중...</p>';
+  const want=rsDate;
+  try{
+    const r=await fetchJsonp(SCRIPT_URL,{action:'getTeams',day:rsPast?'':rsDay,date:rsDate});
+    if(r&&r.ok){
+      // 서버는 요청한 날짜가 없으면 "가장 최근 저장분"을 대신 돌려준다.
+      // 지난 경기는 사용자가 콕 집은 날짜이므로 그 날짜의 저장분만 인정한다.
+      const loaded=(r.teams&&r.teams.length&&(!rsPast||r.date===want))?r.teams:null;
+      if(loaded){
+        if(rsPast){
+          if(r.day)rsDay=r.day;          // 날짜(rsDate)는 고른 그대로 유지
+        }else if(r.date&&r.date!==want){
+          // 이번 주 배정이 없어 예전 배정을 대신 불러온 경우.
+          // 기록은 반드시 이번 주 날짜로 저장되어야 하므로 rsDate 는 바꾸지 않는다.
+          rsLoadedFrom=r.date;
+        }
+        rsTeams=loaded.map((t,i)=>({
+          label:t.label||'',
+          color:t.color||rsDefaultColor(i),
+          members:(t.members||[]).map(m=>({name:m.name,position:m.position||'',memberType:m.memberType||''}))
+        }));
+        rsTeams.forEach(t=>t.members.forEach(m=>rsGet(m.name)));
+        if(rsMatch[0]>=rsTeams.length||rsMatch[1]>=rsTeams.length)rsMatch=[0,Math.min(1,rsTeams.length-1)];
+        rsSaveDraft();
+      }else if(rsPast){
+        // 지난 경기는 "불러오기"가 아니라 "입력"이다.
+        // 저장분이 없으면 빈 팀만 준비하고, 설정 화면에서 바로 명단을 넣는다.
+        rsTeams=[{label:'A',color:rsDefaultColor(0),members:[]},
+                 {label:'B',color:rsDefaultColor(1),members:[]}];
+        rsMatch=[0,1];
+      }else if(rsTeams.some(t=>t.members.length)){
+        // 저장된 팀이 없더라도 직접 구성해 둔 팀은 지우지 않는다 (그대로 수정해서 쓰면 됨)
+        toast(rsDate+' 로 저장된 팀이 없어 현재 팀을 그대로 씁니다','error');
+      }else{
+        rsTeams=[];
+      }
+    }else{
+      toast((r&&r.message)||'불러오기 실패','error');
+    }
+  }catch(e){toast('통신 실패','error')}
+  finally{rsBusy=false;rsRenderSetup()}
+}
+function rsBlankTeams(){
+  rsTeams=[{label:'A',color:rsDefaultColor(0),members:[]},{label:'B',color:rsDefaultColor(1),members:[]}];
+  rsMatch=[0,1];
+  rsSaveDraft();rsRenderSetup();
+}
+function rsAddTeam(){
+  const label=String.fromCharCode(65+rsTeams.length);
+  rsTeams.push({label,color:rsDefaultColor(rsTeams.length),members:[]});
+  rsSaveDraft();rsRenderSetup();
+}
+/* 잘못 추가한 팀 되돌리기. 팀은 최소 2개는 남긴다. */
+function rsRemoveTeam(i){
+  const t=rsTeamAt(i);
+  if(!t)return;
+  if(rsTeams.length<=2){toast('팀은 2개 이상이어야 합니다','error');return}
+  if(t.members.length){
+    popupHtml('<h3>'+esc(t.label)+'팀 제거</h3>'+
+      '<p class="pop-msg">'+t.members.length+'명이 들어 있습니다.\n제거하면 이 팀의 명단과 기록이 사라집니다.</p>'+
+      '<div class="modal-actions">'+
+      '<button class="btn-secondary" onclick="closePopup()">취소</button>'+
+      '<button class="btn-danger" onclick="rsRemoveTeamGo('+i+')">제거</button></div>');
+    return;
+  }
+  rsRemoveTeamGo(i);
+}
+function rsRemoveTeamGo(i){
+  closePopup();
+  const gone=rsTeams.splice(i,1)[0];
+  if(gone)gone.members.forEach(m=>{
+    delete rsStats[m.name];
+    rsHist=rsHist.filter(h=>h.name!==m.name);
+  });
+  // A,B,C… 로 라벨을 다시 매긴다 (YB/OB 처럼 직접 지은 이름은 건드리지 않는다)
+  rsTeams.forEach((t,k)=>{if(/^[A-Z]$/.test(t.label))t.label=String.fromCharCode(65+k)});
+  rsMatch=[0,Math.min(1,rsTeams.length-1)];
+  rsSaveDraft();rsRenderSetup();
+  toast('팀을 제거했습니다','success');
+}
+/* ===== 유니폼색 (기록지 시작 후, 게임마다 변경) ===== */
+function rsColorDialog(){
+  const cards=rsMatch.map(ti=>{
+    const t=rsTeamAt(ti);
+    if(!t)return '';
+    const c=t.color||'#8d8d8d';
+    const sw=RS_PRESET.map(p=>
+      '<button class="rs-swb'+(String(c).toLowerCase()===p.c?' on':'')+'" title="'+p.n+'" '+
+      'style="background:'+p.c+'" onclick="rsSetColor('+ti+',\''+p.c+'\')"></button>').join('');
+    return '<div class="rs-card">'+
+      '<h5><span class="rs-chip" style="background:'+esc(c)+';color:'+rsFg(c)+'">'+esc(t.label)+'팀</span></h5>'+
+      '<div class="rs-sw">'+sw+
+      '<input type="color" value="'+esc(c)+'" onchange="rsSetColor('+ti+',this.value)" '+
+      'style="width:34px;height:28px;padding:0;border:1px solid #ddd;border-radius:6px;background:none;cursor:pointer" />'+
+      '</div></div>';
+  }).join('');
+  popupHtml(
+    '<h3>🎽 유니폼색</h3>'+
+    '<p class="pop-sub">기록지 상단 색이 바뀝니다. 게임마다 유니폼이 달라지면 여기서 변경하세요.</p>'+
+    cards+
+    '<div class="modal-actions"><button class="btn-primary" onclick="closePopup()">확인</button></div>');
+}
+function rsSetColor(i,c){
+  if(!rsTeams[i])return;
+  rsTeams[i].color=c;
+  rsSaveDraft();
+  if(rsView==='sheet'){rsRenderSheet();rsColorDialog()}
+  else rsRenderSetup();
+}
+function rsSetMatch(a,b){rsMatch=[a,b];rsTab=0;rsSaveDraft();rsRenderSetup()}
+function rsSetGame(v){rsGame=Math.max(1,parseInt(v,10)||1);rsSaveDraft()}
+function rsStart(){
+  if(rsTeams.length<2){toast('팀이 2개 이상 필요합니다','error');return}
+  if(!rsDate){toast('날짜를 선택해 주세요','error');return}
+  if(rsMatch[0]===rsMatch[1]){toast('서로 다른 두 팀을 선택해 주세요','error');return}
+  rsTab=0;rsMode=1;
+  rsRenderSheet();
+}
+
+/* ===== 기록지 본화면 ===== */
+function rsTotals(ti){
+  const t=rsTeamAt(ti);
+  const o=rsBlank();
+  o.pts=0;
+  if(t)t.members.forEach(m=>{
+    const s=rsGet(m.name);
+    RS_KEYS.forEach(k=>{o[k]+=(s[k]||0)});
+    o.pts+=rsPts(s);
+  });
+  return o;
+}
+function rsScoreHtml(){
+  return rsMatch.map((ti,idx)=>{
+    const t=rsTeamAt(ti);
+    if(!t)return '';
+    const c=t.color||'#8d8d8d';
+    const cell='<div class="sc" style="background:'+esc(c)+';color:'+rsFg(c)+'">'+
+      '<div class="sc-t">'+esc(t.label)+'팀</div><div class="sc-n">'+rsTotals(ti).pts+'</div></div>';
+    return idx===0?cell+'<div class="sc-vs">VS</div>':cell;
+  }).join('');
+}
+function rsTableHtml(ti){
+  const t=rsTeamAt(ti);
+  if(!t)return '';
+  const bg=t.color||'#2c5f2e',fg=rsFg(bg);
+  const hs='background:'+esc(bg)+';color:'+fg;
+  const head1=RS_VIEW.map(c=>'<th class="rs-code">'+c.code+'</th>').join('');
+  const head2=RS_VIEW.map(c=>'<th>'+c.ko+'</th>').join('');
+
+  const body=t.members.map((m,mi)=>{
+    const s=rsGet(m.name);
+    const cells=RS_VIEW.map(c=>{
+      if(c.t==='pts')
+        return '<td class="rs-ro rs-pts" id="rc-'+ti+'-'+mi+'-pts">'+rsPts(s)+'</td>';
+      if(c.t==='pct')
+        return '<td class="rs-ro" id="rc-'+ti+'-'+mi+'-'+c.code+'">'+rsPct(s[c.m],s[c.a])+'</td>';
+      const v=s[c.k]||0;
+      return '<td class="rs-cell'+(v?'':' zero')+'" id="rc-'+ti+'-'+mi+'-'+c.k+'" '+
+        'onclick="rsBump('+ti+','+mi+',\''+c.k+'\')">'+v+'</td>';
+    }).join('');
+    return '<tr><td class="rs-name">'+
+      '<button class="rs-nbtn" onclick="rsPlayerMenu('+ti+','+mi+')" title="팀 이동 / 제외">'+esc(m.name)+'</button>'+
+      '</td>'+cells+'</tr>';
+  }).join('')||'<tr><td class="rs-name">-</td><td colspan="'+RS_VIEW.length+'" style="padding:16px;color:#aaa;font-size:.85rem">선수를 추가해 주세요</td></tr>';
+
+  const tot=rsTotals(ti);
+  const totCells=RS_VIEW.map(c=>{
+    if(c.t==='pts')return '<td class="rs-pts" id="rt-'+ti+'-pts">'+tot.pts+'</td>';
+    if(c.t==='pct')return '<td class="rs-ro" id="rt-'+ti+'-'+c.code+'">'+rsPct(tot[c.m],tot[c.a])+'</td>';
+    return '<td id="rt-'+ti+'-'+c.k+'">'+(tot[c.k]||0)+'</td>';
+  }).join('');
+
+  return '<div class="rs-tblwrap"><table class="rs-tbl">'+
+    '<thead>'+
+      '<tr style="'+hs+'"><th class="rs-name rs-code" style="'+hs+'">'+esc(t.label)+'팀</th>'+head1+'</tr>'+
+      '<tr style="'+hs+'"><th class="rs-name" style="'+hs+'">선 수</th>'+head2+'</tr>'+
+    '</thead>'+
+    '<tbody>'+body+'</tbody>'+
+    '<tfoot><tr><td class="rs-name" style="padding:0 7px;font-weight:800;font-size:.84rem">합계</td>'+totCells+'</tr></tfoot>'+
+    '</table></div>';
+}
+function rsRenderSheet(){
+  rsView='sheet';
+  const wide=rsIsWide();
+  rsWideMode=wide;
+  if(wide)rsTab=0;
+
+  // 좁은 화면: 팀 탭으로 전환 / 넓은 화면: 두 팀을 위아래로 한 번에
+  const tabsHtml=wide?'':
+    '<div class="rs-row">'+rsMatch.map((ti,i)=>{
+      const t=rsTeamAt(ti);
+      if(!t)return '';
+      const c=t.color||'#8d8d8d';
+      const on=(rsTab===i);
+      return '<button class="rs-tab'+(on?' on':'')+'" onclick="rsSetTab('+i+')" '+
+        'style="'+(on?'background:'+esc(c)+';color:'+rsFg(c)+';border-color:'+esc(c):'')+'">'+
+        esc(t.label)+'팀 기록지</button>';
+    }).join('')+'</div>';
+
+  const tables=wide
+    ? rsMatch.map(ti=>rsTableHtml(ti)).join('<div style="height:16px"></div>')
+    : rsTableHtml(rsMatch[rsTab]);
+
+  openModal(
+    '<div class="rs-toolbar">'+
+      '<div class="rs-hd" style="margin-bottom:8px"><h3 style="font-size:1.02rem">📝 기록지</h3>'+
+      '<span class="rs-sub">'+esc(rsDate)+' · '+esc(rsDay||'-')+' · '+rsGame+'게임</span></div>'+
+      '<div class="rs-score" id="rsScore">'+rsScoreHtml()+'</div>'+
+      tabsHtml+
+      '<div class="rs-row">'+
+        '<button class="rs-mbtn on" id="rsModePlus" onclick="rsSetMode(1)">＋ 입력</button>'+
+        '<button class="rs-mbtn minus" id="rsModeMinus" onclick="rsSetMode(-1)">－ 취소</button>'+
+        '<button class="rs-tool warn" onclick="rsUndo()">↩ 실행취소</button>'+
+      '</div>'+
+      '<div class="rs-row">'+
+        '<button class="rs-tool" onclick="rsColorDialog()">🎽 유니폼색</button>'+
+        '<button class="rs-tool" onclick="rsAddPlayerDialog()">＋ 선수 추가</button>'+
+        '<button class="rs-tool" onclick="rsRenderSetup()">⚙ 팀·게임 설정</button>'+
+        rotateBtnHtml()+
+        '<button class="rs-tool go" id="rsSaveBtn" onclick="rsSaveGame()" style="margin-left:auto">💾 게임 저장</button>'+
+      '</div>'+
+    '</div>'+
+    tables+
+    '<p class="ps-note" style="margin-top:9px">'+
+      '＋ 또는 －를 고른 뒤 칸을 누르면 개수가 오르내립니다. '+
+      '<b>성공</b>을 누르면 <b>시도</b>도 자동으로 함께 올라갑니다. '+
+      '선수 이름을 누르면 팀 이동·제외를 할 수 있습니다.</p>'+
+    '<div style="text-align:center;margin-top:12px">'+
+    '<button class="rs-tool" onclick="closeModal()">닫기</button></div>',
+    true
+  );
+  rsSetMode(rsMode);
+}
+/* 창 크기가 모바일↔PC 경계를 넘으면 레이아웃을 다시 그린다 */
+let _rsResizeTimer=null;
+window.addEventListener('resize',()=>{
+  if(rsView!=='sheet')return;
+  if(!document.getElementById('modal').classList.contains('show'))return;
+  clearTimeout(_rsResizeTimer);
+  _rsResizeTimer=setTimeout(()=>{
+    if(rsView==='sheet'&&rsIsWide()!==rsWideMode)rsRenderSheet();
+  },200);
+});
+/* 좁은 화면에서만 노출되는 가로 보기 버튼 (기록지·선수 스탯 공용) */
+function rotateBtnHtml(){
+  if(window.innerWidth>=900)return '';
+  return '<button class="rs-tool" id="rsRotBtn" onclick="rsToggleRotate()">'+
+    (rsRotOn?'📱 세로 보기':'🔄 가로 보기')+'</button>';
+}
+function rsSetTab(i){rsTab=i;rsRenderSheet()}
+function rsSetMode(v){
+  rsMode=v;
+  const box=document.getElementById('modalBox');
+  if(box)box.classList.toggle('rs-minus',v<0);
+  const p=document.getElementById('rsModePlus'),m=document.getElementById('rsModeMinus');
+  if(p)p.classList.toggle('on',v>0);
+  if(m)m.classList.toggle('on',v<0);
+}
+function rsFlash(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.classList.remove('hit');
+  void el.offsetWidth;          // 애니메이션 재시작
+  el.classList.add('hit');
+  setTimeout(()=>el.classList.remove('hit'),360);
+}
+function rsBump(ti,mi,key){
+  const t=rsTeamAt(ti);
+  const m=t&&t.members[mi];
+  if(!m)return;
+  const s=rsGet(m.name),d=rsMode;
+  const ch=[[key,d]];
+  if(RS_ATT[key])ch.push([RS_ATT[key],d]);   // 성공 +1 → 시도도 +1
+  for(let i=0;i<ch.length;i++){
+    if((s[ch[i][0]]||0)+ch[i][1]<0){toast('0보다 작아질 수 없습니다','error');return}
+  }
+  // 시도를 줄여서 성공보다 작아지는 것은 막는다
+  if(RS_MADE[key]&&d<0&&(s[key]||0)-1<(s[RS_MADE[key]]||0)){
+    toast('시도는 성공보다 적을 수 없습니다','error');return;
+  }
+  ch.forEach(c=>{s[c[0]]=(s[c[0]]||0)+c[1]});
+  rsHist.push({name:m.name,ch});
+  if(rsHist.length>400)rsHist.shift();
+  rsSaveDraft();
+  rsSyncRow(ti,mi);
+  rsFlash('rc-'+ti+'-'+mi+'-'+key);
+}
+function rsSyncRow(ti,mi){
+  const t=rsTeamAt(ti);
+  const m=t&&t.members[mi];
+  if(!m)return;
+  const s=rsGet(m.name);
+  RS_VIEW.forEach(c=>{
+    let el;
+    if(c.t==='pts'){
+      el=document.getElementById('rc-'+ti+'-'+mi+'-pts');
+      if(el)el.textContent=rsPts(s);
+    }else if(c.t==='pct'){
+      el=document.getElementById('rc-'+ti+'-'+mi+'-'+c.code);
+      if(el)el.textContent=rsPct(s[c.m],s[c.a]);
+    }else{
+      el=document.getElementById('rc-'+ti+'-'+mi+'-'+c.k);
+      if(el){el.textContent=s[c.k]||0;el.classList.toggle('zero',!s[c.k])}
+    }
+  });
+  const tot=rsTotals(ti);
+  RS_VIEW.forEach(c=>{
+    let el;
+    if(c.t==='pts'){el=document.getElementById('rt-'+ti+'-pts');if(el)el.textContent=tot.pts}
+    else if(c.t==='pct'){el=document.getElementById('rt-'+ti+'-'+c.code);if(el)el.textContent=rsPct(tot[c.m],tot[c.a])}
+    else{el=document.getElementById('rt-'+ti+'-'+c.k);if(el)el.textContent=tot[c.k]||0}
+  });
+  const sc=document.getElementById('rsScore');
+  if(sc)sc.innerHTML=rsScoreHtml();
+}
+function rsUndo(){
+  const h=rsHist.pop();
+  if(!h){toast('되돌릴 입력이 없습니다','error');return}
+  const s=rsGet(h.name);
+  h.ch.forEach(c=>{s[c[0]]=Math.max(0,(s[c[0]]||0)-c[1])});
+  rsSaveDraft();
+  // 화면에 떠 있는 팀이면 해당 행만 갱신
+  rsMatch.forEach(ti=>{
+    const t=rsTeamAt(ti);
+    if(!t)return;
+    for(let i=0;i<t.members.length;i++)if(t.members[i].name===h.name)rsSyncRow(ti,i);
+  });
+  toast('되돌렸습니다','success');
+}
+
+/* ===== 팀 이동 / 선수 추가·제외 ===== */
+function rsPlayerMenu(ti,mi){
+  const t=rsTeamAt(ti);
+  const m=t&&t.members[mi];
+  if(!m)return;
+  const moves=rsTeams.map((tt,i)=>i===ti?'':
+    '<button class="btn-primary" style="flex:1;min-width:92px;padding:11px;border-radius:10px;border:none;'+
+    'font-family:inherit;font-weight:700;cursor:pointer;font-size:.88rem" '+
+    'onclick="rsMove('+ti+','+mi+','+i+')">'+esc(tt.label)+'팀으로</button>').filter(Boolean).join('');
+  popupHtml(
+    '<h3>'+esc(m.name)+'</h3>'+
+    '<p class="pop-sub">현재 '+esc(t.label)+'팀 · 이번 게임 '+rsPts(rsGet(m.name))+'점</p>'+
+    '<div class="modal-actions" style="margin-top:14px">'+(moves||'<span style="font-size:.85rem;color:#aaa">이동할 다른 팀이 없습니다</span>')+'</div>'+
+    '<div class="modal-actions">'+
+      '<button class="btn-secondary" onclick="closePopup()">취소</button>'+
+      '<button class="btn-danger" onclick="rsDropPlayer('+ti+','+mi+')">이 게임에서 제외</button>'+
+    '</div>'
+  );
+}
+function rsMove(ti,mi,to){
+  const t=rsTeamAt(ti),d=rsTeamAt(to);
+  if(!t||!d)return;
+  const m=t.members.splice(mi,1)[0];
+  if(m)d.members.push(m);       // 기록은 이름 기준이라 이동해도 그대로 따라간다
+  closePopup();
+  rsSaveDraft();
+  rsRenderSheet();
+  toast(m.name+' → '+d.label+'팀','success');
+}
+function rsDropPlayer(ti,mi){
+  const t=rsTeamAt(ti);
+  const m=t&&t.members[mi];
+  if(!m)return;
+  t.members.splice(mi,1);
+  delete rsStats[m.name];
+  rsHist=rsHist.filter(h=>h.name!==m.name);
+  closePopup();
+  rsSaveDraft();
+  rsRenderSheet();
+  toast(m.name+' 제외됨','success');
+}
+/* 설정 화면(팀 입력 메뉴)에서 팀별로 선수를 넣고 뺀다 */
+function rsSetupAdd(i){rsAddPlayerDialog(i)}
+function rsSetupDel(ti,mi){
+  const t=rsTeamAt(ti);
+  const m=t&&t.members[mi];
+  if(!m)return;
+  t.members.splice(mi,1);
+  delete rsStats[m.name];
+  rsHist=rsHist.filter(h=>h.name!==m.name);
+  rsSaveDraft();
+  rsRenderSetup();
+}
+function rsAddPlayerDialog(preTeam){
+  const sel=(preTeam==null)?rsMatch[rsTab]:preTeam;
+  const opts=rsTeams.map((t,i)=>'<option value="'+i+'"'+(i===sel?' selected':'')+'>'+esc(t.label)+'팀</option>').join('');
+  const listed=currentMembers.map(m=>'<option value="'+esc(m.name)+'"></option>').join('');
+  popupHtml(
+    '<h3>선수 추가</h3>'+
+    '<div class="field"><label class="main-label">이름</label>'+
+    '<input type="text" id="rsNewName" list="rsMemList" autocomplete="off" placeholder="이름 입력 또는 선택" />'+
+    '<datalist id="rsMemList">'+listed+'</datalist></div>'+
+    '<div class="field"><label class="main-label">팀</label><select id="rsNewTeam">'+opts+'</select></div>'+
+    '<div class="modal-actions">'+
+      '<button class="btn-secondary" onclick="closePopup()">취소</button>'+
+      '<button class="btn-primary" onclick="rsAddPlayer()">추가</button>'+
+    '</div>'
+  );
+  setTimeout(()=>{const el=document.getElementById('rsNewName');if(el)el.focus()},80);
+}
+function rsAddPlayer(){
+  const nameEl=document.getElementById('rsNewName');
+  const name=String((nameEl&&nameEl.value)||'').trim();
+  if(!name){toast('이름을 입력하세요','error');return}
+  const ti=parseInt((document.getElementById('rsNewTeam')||{}).value,10)||0;
+  for(let i=0;i<rsTeams.length;i++){
+    if(rsTeams[i].members.some(m=>m.name===name)){
+      toast(name+' 은(는) 이미 '+rsTeams[i].label+'팀에 있습니다','error');return;
+    }
+  }
+  const known=currentMembers.find(m=>m.name===name);
+  rsTeams[ti].members.push({name,position:(known&&known.position)||'',memberType:(known&&known.memberType)||'게스트'});
+  rsGet(name);
+  closePopup();
+  rsSaveDraft();
+  if(rsView==='sheet')rsRenderSheet(); else rsRenderSetup();
+  toast(name+' 추가됨','success');
+}
+
+/* ===== 저장 ===== */
+async function rsSaveGame(){
+  if(rsBusy)return;
+  if(!rsDate){toast('날짜를 선택해 주세요','error');return}
+  const teams=rsMatch.map(ti=>{
+    const t=rsTeamAt(ti);
+    if(!t)return null;
+    return {
+      label:t.label,color:t.color||'',
+      players:t.members.map(m=>{
+        const s=rsGet(m.name);
+        return [m.name].concat(RS_KEYS.map(k=>s[k]||0));
+      })
+    };
+  }).filter(Boolean);
+  if(!teams.length||!teams.some(t=>t.players.length)){toast('저장할 선수가 없습니다','error');return}
+
+  rsBusy=true;
+  const btn=document.getElementById('rsSaveBtn');
+  if(btn){btn.disabled=true;btn.textContent='저장 중...'}
+  try{
+    const r=await fetchJsonp(SCRIPT_URL,{action:'saveGame',date:rsDate,day:rsDay,game:rsGame,teams});
+    if(r&&r.ok){
+      rsClearDraft();
+      popupHtml(
+        '<h3>✅ 저장 완료</h3>'+
+        '<p class="pop-msg">저장되었습니다.\n'+esc(rsDate+' '+(rsDay||'')+' '+rsGame+'게임 ('+(r.count||0)+'명)')+'</p>'+
+        '<div class="modal-actions">'+
+          '<button class="btn-secondary" onclick="closePopup()">계속 수정</button>'+
+          '<button class="btn-primary" onclick="rsNextGame()">다음 게임 →</button>'+
+        '</div>');
+    }else{
+      popupMsg((r&&r.message)||'저장에 실패했습니다.');
+    }
+  }catch(e){popupMsg('통신에 실패했습니다.\n입력 내용은 기기에 임시 저장되어 있습니다.')}
+  finally{
+    rsBusy=false;
+    const b=document.getElementById('rsSaveBtn');
+    if(b){b.disabled=false;b.textContent='💾 게임 저장'}
+  }
+}
+function rsNextGame(){
+  closePopup();
+  rsGame++;
+  rsStats={};rsHist=[];
+  rsTeams.forEach(t=>t.members.forEach(m=>rsGet(m.name)));
+  rsSaveDraft();
+  rsRenderSetup();
+}
+
+/* ===== 화면 회전 (가로 보기) =====
+ *  안드로이드 크롬: 전체화면 + 방향 잠금(네이티브)
+ *  iOS 사파리: 방향 잠금 API 자체가 없으므로 CSS 로 화면을 90도 돌린다 */
+function rsToggleRotate(){
+  if(rsRotOn){rsRotOff();return}
+  const el=document.documentElement;
+  const req=el.requestFullscreen||el.webkitRequestFullscreen;
+  const lockable=window.screen&&screen.orientation&&screen.orientation.lock;
+  if(req&&lockable){
+    Promise.resolve(req.call(el))
+      .then(()=>screen.orientation.lock('landscape'))
+      .then(()=>{rsRotOn=true;rsRotNative=true;rsRotBtnLabel();toast('가로 모드','success')})
+      .catch(()=>{
+        try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen()}catch(e){}
+        rsCssRotate();
+      });
+  }else{
+    rsCssRotate();
+  }
+}
+function rsCssRotate(){
+  document.body.classList.add('rs-rot');
+  rsRotOn=true;rsRotNative=false;
+  rsRotBtnLabel();
+  toast('가로 보기 (버튼을 다시 누르면 해제)','success');
+}
+function rsRotOff(){
+  if(rsRotNative){
+    try{if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock()}catch(e){}
+    try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen()}catch(e){}
+  }
+  document.body.classList.remove('rs-rot');
+  rsRotOn=false;rsRotNative=false;
+  rsRotBtnLabel();
+}
+function rsRotBtnLabel(){
+  const b=document.getElementById('rsRotBtn');
+  if(b)b.textContent=rsRotOn?'📱 세로 보기':'🔄 가로 보기';
+}
+document.addEventListener('fullscreenchange',()=>{
+  // 사용자가 뒤로가기 등으로 전체화면을 빠져나간 경우 상태를 되돌린다
+  if(!document.fullscreenElement&&rsRotNative){rsRotOn=false;rsRotNative=false;rsRotBtnLabel()}
+});
+
+/* ===== 팀 생성기 → 팀 저장 (기록지에서 불러쓰기 위함) ===== */
+/* 저장 대상 날짜. 저장분을 불러와 수정 중이면 그 날짜, 아니면 이번 주 해당 요일 */
+function tgTargetDate(){return tgSavedDate||fmtDate(dayDateInWeek(tgDay))}
+
+/* ===== 저장된 팀 불러오기 (수정용) =====
+   진행일(수요일/금요일)별로 가장 나중에 저장된 배정을 날짜 선택 없이 바로 불러온다. */
+async function tgLoadSaved(){
+  if(!tgDay){toast('진행일을 먼저 선택하세요','error');return}
+  try{
+    const r=await fetchJsonp(SCRIPT_URL,{action:'getTeams',day:tgDay});
+    if(!r||!r.ok){toast((r&&r.message)||'불러오기 실패','error');return}
+    if(!r.teams||!r.teams.length){toast('저장된 '+tgDay+' 팀이 없습니다','error');return}
+    const labels=r.teams.map(t=>String(t.label||''));
+    tgMode=(labels.indexOf('YB')>=0&&labels.indexOf('OB')>=0)?'ybob':'num';
+    if(tgMode==='num')tgNumTeams=Math.min(4,Math.max(2,r.teams.length));
+    const assigned={};
+    tgTeams=r.teams.map(t=>(t.members||[]).map(m=>{
+      assigned[m.name]=1;
+      // 회원 명단에 있으면 나이·포지션이 든 원본 객체를 쓰고, 없으면 임시 게스트로 만든다
+      return currentMembers.find(x=>x.name===m.name)||
+        {name:m.name,position:m.position||'가드',isGuest:true,isAdHoc:true,age:null,memberType:m.memberType||'게스트'};
+    }));
+    while(tgTeams.length<tgTeamCount())tgTeams.push([]);
+    tgPool=getAttendees(tgDay).filter(m=>!assigned[m.name]);
+    tgSavedDate=r.date||'';
+    renderTeamGenerator();
+    toast((r.date||'')+' '+tgDay+' 팀을 불러왔습니다','success');
+  }catch(e){toast('통신 실패','error')}
+}
+
+async function tgSaveTeams(){
+  if(!tgTeams.some(t=>t.length>0)){toast('배정된 팀이 없습니다','error');return}
+  const date=tgTargetDate();
+  const teams=tgTeams.map((t,i)=>({
+    label:tgTeamLabel(i),
+    color:rsDefaultColor(i),
+    members:t.map(m=>[m.name,m.position||'',m.isGuest?'게스트':(m.memberType||'')])
+  })).filter(t=>t.members.length>0);
+
+  const btn=document.getElementById('tgSaveBtn');
+  if(btn){btn.disabled=true;btn.textContent='저장 중...'}
+  try{
+    const r=await fetchJsonp(SCRIPT_URL,{action:'saveTeams',date,day:tgDay,teams});
+    if(r&&r.ok){
+      tgSavedDate=date;   // 이후 재저장도 같은 날짜를 수정하도록
+      popupHtml(
+        '<h3>✅ 저장 완료</h3>'+
+        '<p class="pop-msg">저장되었습니다.\n'+esc(date+' '+tgDay+' 팀 배정 ('+(r.count||0)+'명)')+'</p>'+
+        '<p class="pop-sub">📝 기록지 메뉴에서 '+esc(tgDay)+'을(를) 누르면 이 팀을 불러옵니다.<br>'+
+        '같은 날짜로 다시 저장하면 기존 내용이 수정됩니다.</p>'+
+        '<div class="modal-actions"><button class="btn-primary" onclick="closePopup()">확인</button></div>');
+    }else{
+      toast((r&&r.message)||'저장 실패','error');
+    }
+  }catch(e){toast('통신 실패','error')}
+  finally{
+    const b=document.getElementById('tgSaveBtn');
+    if(b){b.disabled=false;b.textContent='💾 팀 저장'}
+  }
+}
+
+/* =========================================================
+ *  3. 선수 스탯
+ * ========================================================= */
+const RS_IDX={};RS_KEYS.forEach((k,i)=>{RS_IDX[k]=i});
+const PS_DAYS=5;          // 참석일 기준 최근 5일
+const PS_ACTIVE_MONTHS=2; // 이 기간 안에 기록이 없으면 표를 비운다
+
+let psSummary=null,psDates=null,psCalY=0,psCalM=0;
+
+document.getElementById('playerStatBtn').addEventListener('click',psOpenSummary);
+
+function psNum(v,div){
+  if(div===1)return String(v||0);
+  return ((v||0)/(div||1)).toFixed(1);
+}
+function psHead(extra){
+  return '<tr><th class="ps-name">선수</th>'+extra+
+    RS_VIEW.map(c=>'<th>'+c.code+'<br><span style="font-weight:600;opacity:.8;font-size:.6rem">'+
+      c.ko.replace(/<br>/g,'')+'</span></th>').join('')+'</tr>';
+}
+/* totals: 13개 배열, pts: 득점 합계, div: 나눌 값(1이면 합계) */
+/* 한 행의 열별 원시값 (강조 비교용) */
+function psRowVal(totals,pts,c){
+  if(c.t==='pts')return pts;
+  if(c.t==='pct'){const a=totals[RS_IDX[c.a]];return a>0?totals[RS_IDX[c.m]]/a:-1}
+  return totals[RS_IDX[c.k]];
+}
+/* maxes 를 주면 그 값과 같은 칸에 배경색을 칠한다 (팀내 최고 수치 표시) */
+function psCells(totals,pts,div,maxes){
+  return RS_VIEW.map((c,i)=>{
+    const txt=(c.t==='pts')?psNum(pts,div)
+      :(c.t==='pct')?rsPct(totals[RS_IDX[c.m]],totals[RS_IDX[c.a]])
+      :psNum(totals[RS_IDX[c.k]],div);
+    let cls=(c.t==='pts')?'ps-pts':'';
+    if(maxes&&maxes[i]!=null){
+      const v=psRowVal(totals,pts,c);
+      if(v>0&&v>=maxes[i]-1e-9)cls=(cls+' '+((c.t==='s'&&PS_NEG[c.k])?'ps-bad':'ps-top')).trim();
+    }
+    return '<td'+(cls?' class="'+cls+'"':'')+'>'+txt+'</td>';
+  }).join('');
+}
+/* 한 팀 안에서 열별 최고값 */
+function psTeamMaxes(rowsOf){
+  return RS_VIEW.map(c=>{
+    if(!psHighlightable(c))return null;
+    const vals=rowsOf.map(x=>psRowVal(x.totals,x.pts,c)).filter(v=>v>0);
+    return vals.length?Math.max.apply(null,vals):null;
+  });
+}
+
+async function psOpenSummary(){
+  openModal('<h3>📈 선수 스탯</h3><p class="ld">불러오는 중...</p>',true);
+  try{
+    const r=await fetchJsonp(SCRIPT_URL,{action:'stats',mode:'summary',days:PS_DAYS,activeMonths:PS_ACTIVE_MONTHS});
+    if(!r||!r.ok){openModal('<h3>📈 선수 스탯</h3><p class="ld">기록을 불러오지 못했습니다.</p>'+
+      '<div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">닫기</button>'+
+      '<button class="btn-primary" onclick="psOpenSummary()">다시 시도</button></div>',true);return}
+    psSummary=r;
+    psRenderSummary();
+  }catch(e){
+    openModal('<h3>📈 선수 스탯</h3><p class="ld">통신에 실패했습니다.</p>'+
+      '<div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">닫기</button>'+
+      '<button class="btn-primary" onclick="psOpenSummary()">다시 시도</button></div>',true);
+  }
+}
+/* 많을수록 나쁜 항목 → 옅은 빨강으로 칠한다 */
+const PS_NEG={tov:1,pf:1};
+/* 강조하지 않는 항목 (많이 던졌다고 잘한 건 아니므로 시도 개수는 제외) */
+const PS_SKIP={p2a:1,p3a:1,fta:1};
+function psHighlightable(c){return !(c.t==='s'&&PS_SKIP[c.k])}
+
+/* 표에 표시되는 "경기당 평균" 값. 성공률은 합계 기준으로 계산한다. */
+function psColVal(p,c){
+  const g=p.games||1;
+  if(c.t==='pts')return p.pts/g;
+  if(c.t==='pct'){
+    const a=p.totals[RS_IDX[c.a]];
+    return a>0?p.totals[RS_IDX[c.m]]/a:-1;
+  }
+  return p.totals[RS_IDX[c.k]]/g;
+}
+/* 상위 10% 경계값 (동점이면 함께 포함) */
+function psTopN(vals){
+  const v=vals.filter(x=>x>0).sort((a,b)=>b-a);
+  if(!v.length)return null;
+  return v[Math.max(1,Math.ceil(v.length*0.1))-1];
+}
+function psThresholds(active){
+  return RS_VIEW.map(c=>psHighlightable(c)?psTopN(active.map(p=>psColVal(p,c))):null);
+}
+/* 경기 승률 (승 ÷ 승패무 합) */
+function psWinRate(p){
+  const n=(p.wins||0)+(p.losses||0)+(p.draws||0);
+  return n>0?(p.wins||0)/n:-1;
+}
+function psWinLabel(p){
+  const w=p.wins||0,l=p.losses||0,d=p.draws||0;
+  return d>0?(w+'-'+l+'-'+d):(w+'-'+l);
+}
+function psSumCells(p,ths){
+  return RS_VIEW.map((c,i)=>{
+    const v=psColVal(p,c);
+    const hot=(ths[i]!=null&&v>0&&v>=ths[i]-1e-9);
+    const cls=((c.t==='pts'?'ps-pts ':'')+
+      (hot?((c.t==='s'&&PS_NEG[c.k])?'ps-bad':'ps-top'):'')).trim();
+    const txt=(c.t==='pct')
+      ? rsPct(p.totals[RS_IDX[c.m]],p.totals[RS_IDX[c.a]])
+      : v.toFixed(1);
+    return '<td'+(cls?' class="'+cls+'"':'')+'>'+txt+'</td>';
+  }).join('');
+}
+
+function psRenderSummary(){
+  const r=psSummary;
+  if(!r)return;
+
+  // 서버 집계를 이름으로 찾아쓰고, 회원 명단 전체를 기준으로 표를 만든다
+  const byName={};
+  (r.players||[]).forEach(p=>{byName[p.name]=p});
+  const names=currentMembers.map(m=>m.name);
+  (r.players||[]).forEach(p=>{if(names.indexOf(p.name)<0)names.push(p.name)});
+
+  const rows=names.map(n=>byName[n]||
+    {name:n,active:false,games:0,days:0,pts:0,totals:new Array(RS_KEYS.length).fill(0)});
+
+  // 경기 평균 득점순 (기록 없는 선수는 뒤로, 그 안에서는 이름순)
+  rows.sort((a,b)=>{
+    if(!!a.active!==!!b.active)return a.active?-1:1;
+    if(!a.active)return a.name<b.name?-1:1;
+    return (b.pts/(b.games||1))-(a.pts/(a.games||1));
+  });
+
+  const active=rows.filter(p=>p.active);
+  const ths=psThresholds(active);
+
+  const winTh=psTopN(active.map(p=>psWinRate(p)));
+  const span=4+RS_VIEW.length;
+  const body=rows.map(p=>{
+    const nameCell='<td class="ps-name"><button class="ps-nb" onclick="psPlayer(\''+jsq(p.name)+'\')">'+esc(p.name)+'</button></td>';
+    if(!p.active){
+      return '<tr>'+nameCell+'<td class="ps-none" colspan="'+span+'">최근 경기 데이터가 없습니다.</td></tr>';
+    }
+    const wr=psWinRate(p);
+    const wrCls=(winTh!=null&&wr>0&&wr>=winTh-1e-9)?' class="ps-top"':'';
+    return '<tr>'+nameCell+'<td>'+p.days+'</td><td>'+p.games+'</td>'+
+      '<td class="ps-wl">'+psWinLabel(p)+'</td>'+
+      '<td'+wrCls+'>'+(wr<0?'-':Math.round(wr*100)+'%')+'</td>'+
+      psSumCells(p,ths)+'</tr>';
+  }).join('');
+
+  openModal(
+    '<div class="rs-hd"><h3>📈 선수 스탯</h3><div style="display:flex;gap:6px">'+rotateBtnHtml()+
+    '<button class="rs-tool" onclick="psOpenCalendar()">📅 날짜별 보기</button></div></div>'+
+    '<p class="ps-note">선수마다 <b>실제 참석한 최근 '+PS_DAYS+'일</b>의 기록을 모아 <b>경기 1게임당 평균</b>으로 계산합니다. '+
+    '평균 득점이 높은 순으로 정렬됩니다.<br>'+
+    '최근 '+PS_ACTIVE_MONTHS+'개월 안에 기록이 없는 선수는 비워 둡니다.'+
+    (r.activeFrom?' (기준일 '+esc(r.activeFrom)+' 이후)':'')+'<br>'+
+    '<span class="ps-top" style="padding:1px 7px;border-radius:5px">초록색</span> = 해당 항목 상위 10% · '+
+    '<span class="ps-bad" style="padding:1px 7px;border-radius:5px">빨간색</span> = 턴오버·반칙 상위 10% '+
+    '(시도 개수는 제외)<br>'+
+    '승률은 같은 날·같은 게임의 상대 팀 득점과 비교해 계산합니다. (상대 기록이 없는 게임은 제외)</p>'+
+    (active.length
+      ? '<div class="rs-tblwrap"><table class="ps-tbl"><thead>'+
+        psHead('<th>참석일</th><th>경기</th><th>승-패</th><th>W%<br><span style="font-weight:600;opacity:.8;font-size:.6rem">승률</span></th>')+'</thead>'+
+        '<tbody>'+body+'</tbody></table></div>'+
+        '<p class="ps-note" style="margin-top:9px">선수 이름을 누르면 게임별 기록을 볼 수 있습니다.</p>'
+      : '<div class="rs-warn">최근 경기 데이터가 없습니다.</div>')+
+    '<div style="text-align:center;margin-top:14px">'+
+    '<button class="rs-tool" onclick="closeModal()">닫기</button></div>',
+    true
+  );
+}
+
+/* ===== 선수별 게임 기록 ===== */
+async function psPlayer(name){
+  openModal('<h3>📈 '+esc(name)+'</h3><p class="ld">불러오는 중...</p>',true);
+  try{
+    const r=await fetchJsonp(SCRIPT_URL,{action:'stats',mode:'player',name});
+    if(!r||!r.ok){toast('불러오기 실패','error');psRenderSummary();return}
+    // g = [날짜, 진행일, 게임, 팀, 유니폼색, ...스탯13, 득점]
+    const gs=r.games||[];
+    const rows=gs.map(g=>{
+      const totals=g.slice(5,5+RS_KEYS.length);
+      const pts=g[5+RS_KEYS.length];
+      const c=g[4]||'#8d8d8d';
+      return '<tr><td class="ps-name">'+esc(g[0])+'</td>'+
+        '<td>'+esc(g[1]||'-')+'</td><td>'+esc(String(g[2]))+'</td>'+
+        '<td><span class="rs-chip" style="background:'+esc(c)+';color:'+rsFg(c)+'">'+esc(g[3]||'-')+'</span></td>'+
+        psCells(totals,pts,1)+'</tr>';
+    }).join('');
+    const s=r.summary;
+    const foot=s
+      ? '<tfoot><tr><td class="ps-name">합계</td><td colspan="2">'+s.days+'일 / '+s.games+'게임</td><td>-</td>'+
+        psCells(s.totals,s.pts,1)+'</tr>'+
+        '<tr><td class="ps-name">경기 평균</td><td colspan="2">전체 기간</td><td>-</td>'+
+        psCells(s.totals,s.pts,s.games||1)+'</tr></tfoot>'
+      : '';
+    openModal(
+      '<div class="rs-hd"><h3>📈 '+esc(name)+'</h3><div style="display:flex;gap:6px">'+rotateBtnHtml()+
+      '<button class="rs-tool" onclick="psRenderSummary()">← 목록으로</button></div></div>'+
+      (gs.length
+        ? '<div class="rs-tblwrap"><table class="ps-tbl"><thead><tr>'+
+          '<th class="ps-name">날짜</th><th>진행일</th><th>게임</th><th>팀</th>'+
+          RS_VIEW.map(c=>'<th>'+c.code+'<br><span style="font-weight:600;opacity:.8;font-size:.6rem">'+
+            c.ko.replace(/<br>/g,'')+'</span></th>').join('')+'</tr></thead>'+
+          '<tbody>'+rows+'</tbody>'+foot+'</table></div>'
+        : '<div class="rs-warn">최근 경기 데이터가 없습니다.</div>')+
+      '<div style="text-align:center;margin-top:14px">'+
+      '<button class="rs-tool" onclick="closeModal()">닫기</button></div>',
+      true
+    );
+  }catch(e){toast('통신 실패','error');psRenderSummary()}
+}
+
+/* ===== 날짜별 보기 (캘린더) ===== */
+async function psOpenCalendar(){
+  if(!psDates){
+    popupHtml('<p class="ld">기록이 있는 날짜를 불러오는 중...</p>');
+    try{
+      const r=await fetchJsonp(SCRIPT_URL,{action:'stats',mode:'dates'});
+      psDates=(r&&r.dates)||[];
+    }catch(e){psDates=[]}
+  }
+  if(!psDates.length){popupMsg('저장된 경기 기록이 없습니다.');return}
+  const last=parseDate(psDates[psDates.length-1])||kstNow();
+  psCalY=last.getFullYear();psCalM=last.getMonth();
+  psRenderCalendar();
+}
+function psCalMove(d){
+  psCalM+=d;
+  if(psCalM<0){psCalM=11;psCalY--}
+  if(psCalM>11){psCalM=0;psCalY++}
+  psRenderCalendar();
+}
+function psRenderCalendar(){
+  const first=new Date(psCalY,psCalM,1).getDay();
+  const dim=new Date(psCalY,psCalM+1,0).getDate();
+  let cells='';
+  for(let i=0;i<first;i++)cells+='<div class="ps-cd empty"></div>';
+  for(let d=1;d<=dim;d++){
+    const ds=psCalY+'-'+('0'+(psCalM+1)).slice(-2)+'-'+('0'+d).slice(-2);
+    const has=psDates.indexOf(ds)>=0;
+    cells+=has
+      ? '<div class="ps-cd has" onclick="psPickDate(\''+ds+'\')">'+d+'</div>'
+      : '<div class="ps-cd">'+d+'</div>';
+  }
+  popupHtml(
+    '<h3>📅 날짜 선택</h3>'+
+    '<div class="ps-calhd"><button onclick="psCalMove(-1)">‹</button>'+
+    '<span>'+psCalY+'년 '+(psCalM+1)+'월</span>'+
+    '<button onclick="psCalMove(1)">›</button></div>'+
+    '<div class="ps-cwd">'+['일','월','화','수','목','금','토'].map(w=>'<div>'+w+'</div>').join('')+'</div>'+
+    '<div class="ps-cal">'+cells+'</div>'+
+    '<p class="ps-hint">초록색 날짜에만 기록이 있습니다.</p>'+
+    '<div class="modal-actions"><button class="btn-secondary" onclick="closePopup()">닫기</button></div>'
+  );
+}
+async function psPickDate(ds){
+  closePopup();
+  openModal('<h3>📈 '+esc(ds)+'</h3><p class="ld">불러오는 중...</p>',true);
+  try{
+    const r=await fetchJsonp(SCRIPT_URL,{action:'stats',mode:'date',date:ds});
+    if(!r||!r.ok){toast('불러오기 실패','error');psRenderSummary();return}
+    psRenderDate(r);
+  }catch(e){toast('통신 실패','error');psRenderSummary()}
+}
+function psRenderDate(r){
+  const names=r.names||[];
+  const chips=names.length
+    ? '<div class="ps-chiprow">'+names.map(n=>'<span class="ps-chip">'+esc(n)+'</span>').join('')+'</div>'
+    : '<div class="rs-warn">이 날짜의 기록이 없습니다.</div>';
+
+  const sumRows=(r.players||[]).map(p=>
+    '<tr><td class="ps-name"><button class="ps-nb" onclick="psPlayer(\''+jsq(p.name)+'\')">'+esc(p.name)+'</button></td>'+
+    '<td>'+p.games+'</td>'+psCells(p.totals,p.pts,1)+'</tr>').join('');
+
+  // 게임·팀별 기록지 (g = [게임, 팀, 유니폼색, 이름, ...스탯13, 득점])
+  const groups={},order=[];
+  (r.games||[]).forEach(g=>{
+    const key=g[0]+'|'+g[1];
+    if(!groups[key]){groups[key]={game:g[0],team:g[1],color:g[2],rows:[]};order.push(key)}
+    groups[key].rows.push(g);
+  });
+  order.sort((a,b)=>{
+    const x=groups[a],y=groups[b];
+    return x.game===y.game?(x.team<y.team?-1:1):(x.game-y.game);
+  });
+  const detail=order.map(k=>{
+    const gp=groups[k];
+    const c=gp.color||'#8d8d8d';
+    const tot=new Array(RS_KEYS.length).fill(0);
+    let pts=0;
+    const parsed=gp.rows.map(g=>({name:g[3],totals:g.slice(4,4+RS_KEYS.length),pts:g[4+RS_KEYS.length]}));
+    const maxes=psTeamMaxes(parsed);   // 팀내 최고 수치
+    const body=parsed.map(x=>{
+      x.totals.forEach((v,i)=>{tot[i]+=v});
+      pts+=x.pts;
+      return '<tr><td class="ps-name">'+esc(x.name)+'</td>'+psCells(x.totals,x.pts,1,maxes)+'</tr>';
+    }).join('');
+    return '<div class="ps-gtitle" style="background:'+esc(c)+';color:'+rsFg(c)+'">'+
+      gp.game+'게임 · '+esc(gp.team)+'팀</div>'+
+      '<div class="rs-tblwrap"><table class="ps-tbl"><thead>'+psHead('')+'</thead><tbody>'+body+'</tbody>'+
+      '<tfoot><tr><td class="ps-name">합계</td>'+psCells(tot,pts,1)+'</tr></tfoot></table></div>';
+  }).join('');
+
+  openModal(
+    '<div class="rs-hd"><h3>📈 '+esc(r.date)+(r.day?' ('+esc(r.day)+')':'')+'</h3>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+rotateBtnHtml()+
+    '<button class="rs-tool" onclick="psOpenCalendar()">📅 다른 날짜</button>'+
+    '<button class="rs-tool" onclick="psRenderSummary()">← 목록으로</button></div></div>'+
+    '<div class="ps-note"><b>참석자 '+names.length+'명</b></div>'+chips+
+    '<p class="ps-note">아래 게임별 표에서 '+
+    '<span class="ps-top" style="padding:1px 7px;border-radius:5px">초록색</span>은 팀내 최고 수치, '+
+    '<span class="ps-bad" style="padding:1px 7px;border-radius:5px">빨간색</span>은 팀내 최다 턴오버·반칙입니다. '+
+    '(시도 개수는 제외)</p>'+
+    (sumRows
+      ? '<div class="ps-note" style="font-weight:700;color:var(--green)">선수별 이 날 합계</div>'+
+        '<div class="rs-tblwrap"><table class="ps-tbl"><thead>'+psHead('<th>경기</th>')+'</thead>'+
+        '<tbody>'+sumRows+'</tbody></table></div>'
+      : '')+
+    detail+
+    '<div style="text-align:center;margin-top:16px">'+
+    '<button class="rs-tool" onclick="closeModal()">닫기</button></div>',
+    true
+  );
+}
+
+/* ===== 시작 ===== */
+function showInitError(){
+  const c=document.getElementById('daysContainer');
+  if(!c)return;
+  c.innerHTML='<div style="padding:14px;text-align:center;color:#c0392b;font-size:.85rem">'+
+    '데이터를 불러오지 못했습니다.<br>'+
+    '<button type="button" class="tg-btn" style="margin-top:8px" onclick="retryInit()">다시 시도</button></div>';
+}
+function retryInit(){
+  const c=document.getElementById('daysContainer');
+  if(c&&!dataReady)c.innerHTML='<div class="sk sk-block"></div><div class="sk sk-block"></div>';
+  loadInit().then(r=>{if(!(r&&r.ok)&&!dataReady)showInitError()});
+}
+(function boot(){
+  // 1) 캐시가 있으면 즉시 렌더 → 체감 로딩 0초
+  const cached=readCache();
+  if(cached)applyInit(cached);
+
+  // 2) <head> 에서 이미 시작해 둔 요청 결과로 최신화
+  loadInit(window.__initReq).then(r=>{
+    if(!(r&&r.ok)&&!dataReady)showInitError();
+  });
+
+  // 3) Service Worker 등록 (HTTPS 환경에서만 동작, 아니면 조용히 건너뜀)
+  registerSW();
+})();
+
+/* HTML·로고를 캐시해 재방문 시 네트워크 없이 화면을 띄운다.
+   file:// 이나 http:// 에서는 브라우저가 지원하지 않으므로 그냥 건너뛴다. */
+function registerSW(){
+  if(!('serviceWorker' in navigator))return;
+  const secure=location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1';
+  if(!secure)return;
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      // 새 버전이 준비되면 알려준다 (이미 캐시로 화면이 떠 있는 상태이므로 강제 새로고침은 하지 않음)
+      reg.addEventListener('updatefound',()=>{
+        const nw=reg.installing;
+        if(!nw)return;
+        nw.addEventListener('statechange',()=>{
+          if(nw.state==='installed'&&navigator.serviceWorker.controller){
+            toast('새 버전이 있습니다. 새로고침해 주세요','success');
+          }
+        });
+      });
+    }).catch(e=>console.warn('SW 등록 건너뜀',e));
+  });
+}
 </script>
 </body>
 </html>
