@@ -7,7 +7,7 @@
  *     (komodo-v2 → komodo-v3 → ...)  안 올리면 방문자에게 옛 화면이 계속 보입니다.
  * ========================================================= */
 
-const CACHE = 'komodo-v2';
+const CACHE = 'komodo-v3';
 
 // 미리 받아둘 파일. 실패해도 설치는 계속 진행됩니다.
 const ASSETS = ['./', './index.html', './logo.png'];

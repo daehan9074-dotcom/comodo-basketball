@@ -45,9 +45,27 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{font-family:var(--font);background:var(--beige);color:var(--text);min-height:100vh;padding:28px 14px 80px;-webkit-text-size-adjust:100%}
-  .top-bar{max-width:600px;margin:0 auto 14px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
-  .top-btn{background:var(--white);border:1.5px solid var(--green);color:var(--green);padding:8px 14px;border-radius:10px;font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;transition:.18s}
+  /* 아래 카드(흰 테두리)와 정확히 같은 폭. 넘칠 일이 없도록 버튼이 남는 폭을 나눠 쓴다 */
+  .top-bar{max-width:600px;margin:0 auto 14px;display:flex;justify-content:flex-end;align-items:stretch;gap:8px;overflow:hidden}
+  .top-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;background:var(--white);border:1.5px solid var(--green);color:var(--green);padding:8px 14px;border-radius:10px;font-family:inherit;font-size:.82rem;font-weight:600;line-height:1.25;white-space:nowrap;cursor:pointer;transition:.18s}
   .top-btn:hover{background:var(--green);color:#fff}
+  .top-btn .tb-ic{line-height:1}
+  .top-btn .tb-tx-s{display:none}
+  .top-btn.icon-only .tb-tx,.top-btn.icon-only .tb-tx-s{display:none}
+  /* 좀은 화면: 메뉴 6개를 한 줄에 (텍스트 축약 + 균등 분할) */
+  @media(max-width:620px){
+    .top-bar{gap:4px;justify-content:space-between}
+    .top-btn{flex:1 1 0;min-width:0;gap:3px;padding:7px 4px;border-radius:9px;font-size:.68rem}
+    .top-btn .tb-tx{display:none}
+    .top-btn .tb-tx-s{display:inline}
+    .top-btn.icon-only{flex:0 0 auto;padding:7px 10px;font-size:.9rem}
+  }
+  /* 더 좁은 화면: 아이콘 위 / 글자 아래로 쌓아 폭을 줄인다 */
+  @media(max-width:430px){
+    .top-btn{flex-direction:column;gap:2px;padding:6px 3px;font-size:clamp(.5rem,2.5vw,.64rem)}
+    .top-btn .tb-ic{font-size:1.05rem}
+    .top-btn.icon-only{padding:6px 9px;font-size:1.05rem}
+  }
   .card{background:var(--white);max-width:600px;margin:0 auto;border-radius:20px;box-shadow:var(--shadow);overflow:hidden}
 
   /* 헤더: 흰 배경 + 검정 텍스트 + 큰 로고 */
@@ -71,7 +89,7 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .field{margin-bottom:22px}
   .field label.main-label{display:block;font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--label);margin-bottom:8px}
   .field label.main-label .required{color:var(--green);margin-left:3px}
-  input[type="text"],input[type="password"],input[type="number"],textarea,select{width:100%;background:var(--field-bg);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:.93rem;color:var(--text);transition:.2s;outline:none}
+  input[type="text"],input[type="password"],input[type="number"],input[type="url"],textarea,select{width:100%;background:var(--field-bg);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-family:inherit;font-size:.93rem;color:var(--text);transition:.2s;outline:none}
   input:focus,textarea:focus,select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(44,95,46,.1)}
   textarea{resize:vertical;min-height:90px;line-height:1.6}
 
@@ -87,6 +105,14 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .member-info .mi-row span{display:inline-flex;gap:4px}
   .member-info .mi-row b{color:var(--green);font-weight:700}
   .member-info .mi-badge{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:100px;font-size:.72rem;font-weight:700}
+  /* 회원 정보 + 오른쪽 '나의 스탯' 버튼 */
+  .member-info .mi-hd{display:flex;align-items:flex-start;gap:10px}
+  .member-info .mi-body{flex:1 1 auto;min-width:0}
+  .member-info .mi-stat{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;background:var(--green);border:none;
+    color:#fff;padding:9px 12px;border-radius:9px;font-family:inherit;font-size:.78rem;font-weight:700;
+    white-space:nowrap;cursor:pointer;transition:.18s}
+  .member-info .mi-stat:hover{background:var(--green-mid)}
+  @media(max-width:430px){.member-info .mi-stat{padding:8px 9px;font-size:.72rem}}
   .mi-badge.paid{background:#e8f4e8;color:#2c5f2e;border:1px solid #2c5f2e}
   .mi-badge.unpaid{background:#fdecea;color:#c0392b;border:1px solid #c0392b}
   .mi-badge.reg{background:#e6f0fa;color:#1f4e8a;border:1px solid #1f4e8a}
@@ -199,13 +225,42 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .btn-copy:hover{background:var(--green-mid)}
 
   /* 로딩 스켈레톤 */
+  /* ===== 첫 로딩 화면: 농구공이 튀면서 돈다 ===== */
+  #splash{position:fixed;inset:0;z-index:2500;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:var(--beige);transition:opacity .35s ease}
+  #splash.gone{opacity:0;pointer-events:none;visibility:hidden}
+  #splash .bb-wrap{width:72px;height:72px;margin-bottom:9px;animation:bbUp .6s cubic-bezier(.33,0,.66,1) infinite alternate}
+  #splash .bb{width:100%;height:100%;display:block;animation:spin 1.2s linear infinite}
+  #splash .bb-sh{width:50px;height:9px;border-radius:50%;background:#2c5f2e;opacity:.5;
+    animation:bbSh .6s cubic-bezier(.33,0,.66,1) infinite alternate}
+  #splash .bb-tx{margin-top:20px;font-size:.86rem;font-weight:600;color:var(--green)}
+  @keyframes bbUp{from{transform:translateY(4px)}to{transform:translateY(-24px)}}
+  @keyframes bbSh{from{transform:scaleX(1);opacity:.5}to{transform:scaleX(.6);opacity:.18}}
+  @media(prefers-reduced-motion:reduce){
+    #splash .bb-wrap,#splash .bb,#splash .bb-sh{animation:none}
+  }
+
   .sk{background:linear-gradient(90deg,#ececec 25%,#f6f6f6 37%,#ececec 63%);background-size:400% 100%;animation:skl 1.3s ease infinite;border-radius:8px}
   @keyframes skl{0%{background-position:100% 50%}100%{background-position:0 50%}}
   .sk-line{height:13px;margin:7px 0}
   .sk-block{height:74px;margin-bottom:10px;border-radius:12px}
 
   /* ===== 참석자 현황 한 줄 요약 ===== */
-  .att-summary{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;background:var(--green-light);border:1.5px solid #c6ddc6;border-radius:12px;padding:12px 15px;margin-bottom:20px}
+  .att-summary{display:flex;flex-wrap:nowrap;gap:10px;align-items:center;background:var(--green-light);border:1.5px solid #c6ddc6;border-radius:12px;padding:12px 15px;margin-bottom:20px}
+  .att-summary .as-list{flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center}
+  .att-summary .as-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;background:var(--green);border:none;color:#fff;padding:7px 11px;border-radius:9px;font-family:inherit;font-size:.76rem;font-weight:700;white-space:nowrap;cursor:pointer;transition:.18s}
+  .att-summary .as-btn:hover{background:var(--green-mid)}
+  .att-summary .as-btn .ab-tx-s{display:none}
+  @media(max-width:430px){
+    .att-summary{padding:11px 12px;gap:8px}
+    .att-summary .as-btn{padding:6px 8px;font-size:.7rem}
+    .att-summary .as-item{font-size:.82rem}
+    .att-summary .as-item b{font-size:.95rem}
+  }
+  @media(max-width:355px){
+    .att-summary .as-btn .ab-tx{display:none}
+    .att-summary .as-btn .ab-tx-s{display:inline}
+  }
   .att-summary .as-item{font-size:.9rem;font-weight:600;color:var(--green);white-space:nowrap}
   .att-summary .as-item b{font-size:1.05rem;font-weight:800;margin:0 1px}
   .att-summary .as-item.past{color:#a0a0a0;text-decoration:line-through;text-decoration-thickness:1.5px}
@@ -222,6 +277,9 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   /* ===== 넓은 모달 (기록지 / 스탯) ===== */
   .modal.wide{max-width:1140px}
   .ld{text-align:center;color:#888;padding:34px 0;font-size:.9rem}
+  .ld::before{content:'';display:block;width:36px;height:36px;margin:0 auto 12px;
+    background:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23e07b39'/%3E%3Cg fill='none' stroke='%232a1a12' stroke-width='4.5' stroke-linecap='round'%3E%3Ccircle cx='50' cy='50' r='45'/%3E%3Cpath d='M50 5V95'/%3E%3Cpath d='M5 50H95'/%3E%3Cpath d='M19 16C36 32 36 68 19 84'/%3E%3Cpath d='M81 16C64 32 64 68 81 84'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;animation:spin 1.2s linear infinite}
+  @media(prefers-reduced-motion:reduce){.ld::before{animation:none}}
   .rs-hd{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
   .rs-hd h3{margin:0}
   .rs-sub{font-size:.8rem;color:var(--label);font-weight:600}
@@ -324,7 +382,16 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .ps-wl{font-size:.72rem;color:#8a857d;font-weight:600}
   .ps-chiprow{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 14px}
   .ps-chip{background:var(--green-light);border:1px solid #b9d4b9;color:var(--green);border-radius:100px;padding:4px 11px;font-size:.8rem;font-weight:600}
-  .ps-gtitle{display:inline-block;padding:5px 13px;border-radius:8px;font-size:.85rem;font-weight:800;margin:16px 0 7px}
+  .ps-gtitle{display:inline-flex;align-items:center;gap:9px;padding:5px 13px;border-radius:8px;font-size:.85rem;font-weight:800;margin:16px 0 7px}
+  /* 영상 링크 */
+  .ps-yt{display:inline-flex;align-items:center;gap:3px;color:#c0392b;font-weight:800;text-decoration:none;white-space:nowrap}
+  .ps-yt:hover{text-decoration:underline}
+  .ps-gtitle .ps-ytg{display:inline-flex;align-items:center;gap:3px;background:rgba(255,255,255,.9);color:#c0392b;
+    border-radius:100px;padding:2px 9px;font-size:.72rem;font-weight:800;text-decoration:none}
+  .ps-gtitle .ps-ytg:hover{background:#fff}
+  .rs-tool.vid{border-color:#e2b4ad;color:#c0392b}
+  .ps-cd.vid{position:relative}
+  .ps-cd.vid::after{content:'▶';position:absolute;right:3px;bottom:2px;font-size:.42rem;opacity:.95}
   .ps-calhd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
   .ps-calhd span{font-size:1rem;font-weight:700}
   .ps-calhd button{width:36px;height:36px;border:1.5px solid var(--border);background:#fff;border-radius:9px;font-size:1.1rem;cursor:pointer;font-family:inherit;color:var(--green)}
@@ -357,12 +424,30 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
 </head>
 <body>
 
+<div id="splash">
+  <div class="bb-wrap">
+    <svg class="bb" viewBox="0 0 100 100" role="img" aria-label="불러오는 중">
+      <circle cx="50" cy="50" r="45" fill="#e07b39"/>
+      <g fill="none" stroke="#2a1a12" stroke-width="4.5" stroke-linecap="round">
+        <circle cx="50" cy="50" r="45"/>
+        <path d="M50 5V95"/><path d="M5 50H95"/>
+        <path d="M19 16C36 32 36 68 19 84"/>
+        <path d="M81 16C64 32 64 68 81 84"/>
+      </g>
+    </svg>
+  </div>
+  <div class="bb-sh"></div>
+  <div class="bb-tx">불러오는 중...</div>
+</div>
+<!-- 스크립트가 멈춰도 로딩 화면에 갇히지 않도록 하는 안전장치 -->
+<script>setTimeout(function(){var s=document.getElementById('splash');if(s)s.classList.add('gone')},9000)</script>
+
 <div class="top-bar">
-  <button class="top-btn" id="statusBtn">📊 참가 현황</button>
-  <button class="top-btn" id="teamBtn">🏀 팀 생성기</button>
-  <button class="top-btn" id="sheetBtn">📝 기록지</button>
-  <button class="top-btn" id="playerStatBtn">📈 선수 스탯</button>
-  <button class="top-btn" id="adminBtn">⚙️ 관리자</button>
+  <button class="top-btn" id="statusBtn"><span class="tb-ic">📊</span><span class="tb-tx">참가 현황</span><span class="tb-tx-s">참가현황</span></button>
+  <button class="top-btn" id="teamBtn"><span class="tb-ic">🏀</span><span class="tb-tx">팀 생성기</span><span class="tb-tx-s">팀생성기</span></button>
+  <button class="top-btn" id="sheetBtn"><span class="tb-ic">📝</span><span class="tb-tx">기록지</span><span class="tb-tx-s">기록지</span></button>
+  <button class="top-btn" id="playerStatBtn"><span class="tb-ic">📈</span><span class="tb-tx">선수 스탯</span><span class="tb-tx-s">선수스탯</span></button>
+  <button class="top-btn icon-only" id="adminBtn" title="관리자" aria-label="관리자"><span class="tb-ic">⚙️</span><span class="tb-tx">관리자</span></button>
 </div>
 
 <div class="card" id="mainCard">
@@ -374,7 +459,10 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
 
   <div class="card-body" id="formWrapper">
 
-    <div class="att-summary" id="attSummary"><span class="sk sk-line"></span></div>
+    <div class="att-summary">
+      <div class="as-list" id="attSummary"><span class="sk sk-line"></span></div>
+      <button type="button" class="as-btn" id="attSummaryBtn" title="참가 현황"><span>📊</span><span class="ab-tx">참가 현황</span><span class="ab-tx-s">현황</span></button>
+    </div>
 
     <div class="notice-box" id="noticeBox">
       <div class="notice-label">📢 공지사항</div>
@@ -652,6 +740,7 @@ function showMemberInfo(m){
   else if(m.isInactive)notice='<div class="inactive-notice">현재 휴활 회원입니다. 참석 가능한 날을 선택해주세요.</div>';
   const numberSpan=m.isGuest?'':'<span><b>등번호</b>'+esc(m.number||'-')+'</span>';
   info.innerHTML=
+    '<div class="mi-hd"><div class="mi-body">'+
     '<div class="mi-row">'+
     '<span><b>이름</b>'+esc(m.name)+'</span>'+
     '<span><b>나이</b>'+esc((m.age===''||m.age==null)?'-':m.age)+'</span>'+
@@ -659,6 +748,9 @@ function showMemberInfo(m){
     '<span><b>포지션</b>'+esc(m.position||'-')+'</span>'+
     '</div>'+
     (badges?'<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'+badges+'</div>':'')+
+    '</div>'+
+    '<button type="button" class="mi-stat" onclick="psMyStat()">📈 나의 스탯</button>'+
+    '</div>'+
     notice;
   info.classList.add('show');
   if(m.isGuest){toast('게스트로 참석합니다','success')}
@@ -832,6 +924,9 @@ async function admResetPage(){
 }
 
 /* ===== 참가 현황 ===== */
+document.getElementById('attSummaryBtn').addEventListener('click',()=>{
+  document.getElementById('statusBtn').click();
+});
 document.getElementById('statusBtn').addEventListener('click',()=>{
   // 캐시된 데이터가 있으면 즉시 렌더 후 백그라운드로 최신화
   if(dataReady)renderStatusModal();
@@ -1329,6 +1424,40 @@ function renderAttSummary(){
     return '<span class="as-item'+(isDayPassed(d.title)?' past':'')+'">'+
       esc(d.title)+' 참석자 현재 <b>'+n+'</b>명</span>';
   }).join('');
+}
+
+/* =========================================================
+ *  1-2. 영상 링크 (유튜브 등)
+ *  서버는 [날짜, 게임번호, 링크] 배열로 내려준다. 게임번호 0 = 그 날 전체 영상
+ * ========================================================= */
+function ytId(u){
+  const t=String(u||'').trim();
+  const m=t.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|live\/|shorts\/))([A-Za-z0-9_-]{11})/);
+  if(m)return m[1];
+  return /^[A-Za-z0-9_-]{11}$/.test(t)?t:'';
+}
+/* 유튜브면 표준 주소로 정리(시작 시간 t= 는 유지), 그 밖의 주소는 그대로 쓴다 */
+function vidNorm(u){
+  const t=String(u||'').trim();
+  if(!t)return '';
+  const id=ytId(t);
+  if(!id)return /^https?:\/\//i.test(t)?t:'';
+  const sec=t.match(/[?&#]t=(\d+)/);
+  return 'https://www.youtube.com/watch?v='+id+(sec?'&t='+sec[1]:'');
+}
+function vidKey(d,g){return d+'|'+(Number(g)||0)}
+function vidMap(list){
+  const m={};
+  (list||[]).forEach(v=>{const u=vidNorm(v[2]);if(u)m[vidKey(v[0],v[1])]=u});
+  return m;
+}
+/* 게임 전용 링크가 없으면 그 날 전체 영상으로 대체한다 */
+function vidFind(map,d,g){
+  if(!map)return '';
+  return map[vidKey(d,g)]||map[vidKey(d,0)]||'';
+}
+function vidLink(url,label,cls){
+  return '<a class="'+(cls||'ps-yt')+'" href="'+esc(url)+'" target="_blank" rel="noopener">▶ '+esc(label)+'</a>';
 }
 
 /* =========================================================
@@ -1838,6 +1967,7 @@ function rsRenderSheet(){
         '<button class="rs-tool" onclick="rsColorDialog()">🎽 유니폼색</button>'+
         '<button class="rs-tool" onclick="rsAddPlayerDialog()">＋ 선수 추가</button>'+
         '<button class="rs-tool" onclick="rsRenderSetup()">⚙ 팀·게임 설정</button>'+
+        '<button class="rs-tool vid" onclick="rsVideoDialog()">🎬 영상 링크</button>'+
         rotateBtnHtml()+
         '<button class="rs-tool go" id="rsSaveBtn" onclick="rsSaveGame()" style="margin-left:auto">💾 게임 저장</button>'+
       '</div>'+
@@ -2068,6 +2198,7 @@ async function rsSaveGame(){
         '<p class="pop-msg">저장되었습니다.\n'+esc(rsDate+' '+(rsDay||'')+' '+rsGame+'게임 ('+(r.count||0)+'명)')+'</p>'+
         '<div class="modal-actions">'+
           '<button class="btn-secondary" onclick="closePopup()">계속 수정</button>'+
+          '<button class="btn-secondary" onclick="rsVideoDialog()">🎬 영상 링크</button>'+
           '<button class="btn-primary" onclick="rsNextGame()">다음 게임 →</button>'+
         '</div>');
     }else{
@@ -2080,6 +2211,62 @@ async function rsSaveGame(){
     if(b){b.disabled=false;b.textContent='💾 게임 저장'}
   }
 }
+/* ===== 영상 링크 등록 (기록지에서 바로) ===== */
+let rsVidScope='day';       // 'day' = 그 날 전체 / 'game' = 이 게임 전용
+let rsVidMap={};
+async function rsVideoDialog(){
+  if(!rsDate){toast('날짜를 먼저 선택해 주세요','error');return}
+  popupHtml('<h3>🎬 영상 링크</h3><p class="ld">불러오는 중...</p>');
+  try{
+    const r=await fetchJsonp(SCRIPT_URL,{action:'getVideos',date:rsDate});
+    rsVidMap=vidMap((r&&r.videos)||[]);
+  }catch(e){rsVidMap={}}
+  const cur=rsVidMap[vidKey(rsDate,rsVidScope==='game'?rsGame:0)]||'';
+  popupHtml(
+    '<h3>🎬 영상 링크</h3>'+
+    '<p class="pop-sub">'+esc(rsDate)+(rsDay?' · '+esc(rsDay):'')+'<br>'+
+    '유튜브 주소를 붙여넣으면 <b>선수 스탯</b>과 <b>날짜별 보기</b>에서 ▶ 로 바로 열립니다.<br>'+
+    '주소 끝에 <b>&t=1200</b> 처럼 초를 붙이면 그 시점부터 재생됩니다.</p>'+
+    '<div class="field"><label class="main-label">적용 범위</label>'+
+    '<select id="rsVidScopeSel" onchange="rsVidScopeChange()">'+
+      '<option value="day"'+(rsVidScope==='day'?' selected':'')+'>이 날 전체 (모든 게임)</option>'+
+      '<option value="game"'+(rsVidScope==='game'?' selected':'')+'>'+rsGame+'게임 전용</option>'+
+    '</select></div>'+
+    '<div class="field"><label class="main-label">영상 주소</label>'+
+    '<input type="url" id="rsVidUrl" placeholder="https://youtu.be/..." value="'+esc(cur)+'" autocomplete="off" />'+
+    '<div class="member-info show" style="margin-top:7px">비워 두고 저장하면 등록된 링크가 삭제됩니다. '+
+    '구글시트 <b>영상</b> 시트에서 직접 입력·수정해도 됩니다.</div></div>'+
+    '<div class="modal-actions"><button class="btn-secondary" onclick="closePopup()">취소</button>'+
+    '<button class="btn-primary" id="rsVidSaveBtn" onclick="rsVidSave()">저장</button></div>');
+}
+function rsVidScopeChange(){
+  const sel=document.getElementById('rsVidScopeSel'),inp=document.getElementById('rsVidUrl');
+  if(!sel||!inp)return;
+  rsVidScope=sel.value;
+  inp.value=rsVidMap[vidKey(rsDate,rsVidScope==='game'?rsGame:0)]||'';
+}
+async function rsVidSave(){
+  const inp=document.getElementById('rsVidUrl');
+  const raw=((inp&&inp.value)||'').trim();
+  const url=raw?vidNorm(raw):'';
+  if(raw&&!url){toast('영상 주소를 확인해 주세요','error');return}
+  const game=(rsVidScope==='game')?rsGame:0;
+  const btn=document.getElementById('rsVidSaveBtn');
+  if(btn){btn.disabled=true;btn.textContent='저장 중...'}
+  try{
+    const r=await fetchJsonp(SCRIPT_URL,{action:'saveVideo',date:rsDate,day:rsDay,game,url});
+    if(r&&r.ok){
+      if(url)rsVidMap[vidKey(rsDate,game)]=url; else delete rsVidMap[vidKey(rsDate,game)];
+      closePopup();
+      toast(url?'영상 링크를 저장했습니다':'영상 링크를 삭제했습니다','success');
+    }else{toast((r&&r.message)||'저장 실패','error')}
+  }catch(e){toast('통신 실패','error')}
+  finally{
+    const b=document.getElementById('rsVidSaveBtn');
+    if(b){b.disabled=false;b.textContent='저장'}
+  }
+}
+
 function rsNextGame(){
   closePopup();
   rsGame++;
@@ -2201,7 +2388,7 @@ const RS_IDX={};RS_KEYS.forEach((k,i)=>{RS_IDX[k]=i});
 const PS_DAYS=5;          // 참석일 기준 최근 5일
 const PS_ACTIVE_MONTHS=2; // 이 기간 안에 기록이 없으면 표를 비운다
 
-let psSummary=null,psDates=null,psCalY=0,psCalM=0;
+let psSummary=null,psDates=null,psCalY=0,psCalM=0,psVidDates=[];
 
 document.getElementById('playerStatBtn').addEventListener('click',psOpenSummary);
 
@@ -2308,13 +2495,17 @@ function psSumCells(p,ths){
 
 function psRenderSummary(){
   const r=psSummary;
-  if(!r)return;
+  if(!r){psOpenSummary();return}   // 개인 스탯부터 연 경우엔 목록을 새로 불러온다
 
-  // 서버 집계를 이름으로 찾아쓰고, 회원 명단 전체를 기준으로 표를 만든다
+  // 서버 집계를 이름으로 찾아쓰고, 회원 명단(게스트 제외)을 기준으로 표를 만든다
   const byName={};
   (r.players||[]).forEach(p=>{byName[p.name]=p});
-  const names=currentMembers.map(m=>m.name);
-  (r.players||[]).forEach(p=>{if(names.indexOf(p.name)<0)names.push(p.name)});
+  // 게스트는 누적 스탯 목록에서 빼고, 날짜별 보기에서는 그대로 남겨 둔다
+  const roster=currentMembers.filter(m=>!m.isGuest&&m.memberType!=='게스트');
+  const inRoster={};roster.forEach(m=>{inRoster[m.name]=1});
+  const names=roster.length?roster.map(m=>m.name)
+    :(r.players||[]).map(p=>p.name);            // 회원 명단을 못 불러왔을 때의 대비
+  if(roster.length)(r.players||[]).forEach(p=>{if(inRoster[p.name]&&names.indexOf(p.name)<0)names.push(p.name)});
 
   const rows=names.map(n=>byName[n]||
     {name:n,active:false,games:0,days:0,pts:0,totals:new Array(RS_KEYS.length).fill(0)});
@@ -2349,7 +2540,8 @@ function psRenderSummary(){
     '<button class="rs-tool" onclick="psOpenCalendar()">📅 날짜별 보기</button></div></div>'+
     '<p class="ps-note">선수마다 <b>실제 참석한 최근 '+PS_DAYS+'일</b>의 기록을 모아 <b>경기 1게임당 평균</b>으로 계산합니다. '+
     '평균 득점이 높은 순으로 정렬됩니다.<br>'+
-    '최근 '+PS_ACTIVE_MONTHS+'개월 안에 기록이 없는 선수는 비워 둡니다.'+
+    '최근 '+PS_ACTIVE_MONTHS+'개월 안에 기록이 없는 선수는 비워 둡니다. '+
+    '<b>게스트는 이 목록에서 빠지며</b>, 📅 날짜별 보기에서는 그대로 표시됩니다.'+
     (r.activeFrom?' (기준일 '+esc(r.activeFrom)+' 이후)':'')+'<br>'+
     '<span class="ps-top" style="padding:1px 7px;border-radius:5px">초록색</span> = 해당 항목 상위 10% · '+
     '<span class="ps-bad" style="padding:1px 7px;border-radius:5px">빨간색</span> = 턴오버·반칙 상위 10% '+
@@ -2367,6 +2559,12 @@ function psRenderSummary(){
   );
 }
 
+/* 이름 확인 뒤 '나의 스탯' 버튼 → 본인 게임 기록 바로 열기 */
+function psMyStat(){
+  if(!currentMember){toast('먼저 이름을 확인해 주세요','error');return}
+  psPlayer(currentMember.name);
+}
+
 /* ===== 선수별 게임 기록 ===== */
 async function psPlayer(name){
   openModal('<h3>📈 '+esc(name)+'</h3><p class="ld">불러오는 중...</p>',true);
@@ -2375,11 +2573,15 @@ async function psPlayer(name){
     if(!r||!r.ok){toast('불러오기 실패','error');psRenderSummary();return}
     // g = [날짜, 진행일, 게임, 팀, 유니폼색, ...스탯13, 득점]
     const gs=r.games||[];
+    const vm=vidMap(r.videos);
+    let hasVid=false;
     const rows=gs.map(g=>{
       const totals=g.slice(5,5+RS_KEYS.length);
       const pts=g[5+RS_KEYS.length];
       const c=g[4]||'#8d8d8d';
-      return '<tr><td class="ps-name">'+esc(g[0])+'</td>'+
+      const vu=vidFind(vm,g[0],g[2]);   // 그 날짜·게임의 영상 (없으면 그 날 전체 영상)
+      if(vu)hasVid=true;
+      return '<tr><td class="ps-name">'+(vu?vidLink(vu,g[0]):esc(g[0]))+'</td>'+
         '<td>'+esc(g[1]||'-')+'</td><td>'+esc(String(g[2]))+'</td>'+
         '<td><span class="rs-chip" style="background:'+esc(c)+';color:'+rsFg(c)+'">'+esc(g[3]||'-')+'</span></td>'+
         psCells(totals,pts,1)+'</tr>';
@@ -2394,6 +2596,8 @@ async function psPlayer(name){
     openModal(
       '<div class="rs-hd"><h3>📈 '+esc(name)+'</h3><div style="display:flex;gap:6px">'+rotateBtnHtml()+
       '<button class="rs-tool" onclick="psRenderSummary()">← 목록으로</button></div></div>'+
+      (hasVid?'<p class="ps-note" style="margin-bottom:8px">'+
+        '<span class="ps-yt">▶ 날짜</span>를 누르면 그 경기 영상이 새 창에서 열립니다.</p>':'')+
       (gs.length
         ? '<div class="rs-tblwrap"><table class="ps-tbl"><thead><tr>'+
           '<th class="ps-name">날짜</th><th>진행일</th><th>게임</th><th>팀</th>'+
@@ -2415,6 +2619,7 @@ async function psOpenCalendar(){
     try{
       const r=await fetchJsonp(SCRIPT_URL,{action:'stats',mode:'dates'});
       psDates=(r&&r.dates)||[];
+      psVidDates=(r&&r.videoDates)||[];
     }catch(e){psDates=[]}
   }
   if(!psDates.length){popupMsg('저장된 경기 기록이 없습니다.');return}
@@ -2436,8 +2641,9 @@ function psRenderCalendar(){
   for(let d=1;d<=dim;d++){
     const ds=psCalY+'-'+('0'+(psCalM+1)).slice(-2)+'-'+('0'+d).slice(-2);
     const has=psDates.indexOf(ds)>=0;
+    const vid=psVidDates.indexOf(ds)>=0;   // 영상 링크가 등록된 날짜
     cells+=has
-      ? '<div class="ps-cd has" onclick="psPickDate(\''+ds+'\')">'+d+'</div>'
+      ? '<div class="ps-cd has'+(vid?' vid':'')+'" onclick="psPickDate(\''+ds+'\')">'+d+'</div>'
       : '<div class="ps-cd">'+d+'</div>';
   }
   popupHtml(
@@ -2447,7 +2653,8 @@ function psRenderCalendar(){
     '<button onclick="psCalMove(1)">›</button></div>'+
     '<div class="ps-cwd">'+['일','월','화','수','목','금','토'].map(w=>'<div>'+w+'</div>').join('')+'</div>'+
     '<div class="ps-cal">'+cells+'</div>'+
-    '<p class="ps-hint">초록색 날짜에만 기록이 있습니다.</p>'+
+    '<p class="ps-hint">초록색 날짜에만 기록이 있습니다.'+
+    (psVidDates.length?'<br>오른쪽 아래 ▶ 표시는 영상 링크가 등록된 날짜입니다.':'')+'</p>'+
     '<div class="modal-actions"><button class="btn-secondary" onclick="closePopup()">닫기</button></div>'
   );
 }
@@ -2460,8 +2667,12 @@ async function psPickDate(ds){
     psRenderDate(r);
   }catch(e){toast('통신 실패','error');psRenderSummary()}
 }
+let psDayVid='';
+function psOpenDayVid(){if(psDayVid)window.open(psDayVid,'_blank','noopener')}
 function psRenderDate(r){
   const names=r.names||[];
+  const vm=vidMap(r.videos);
+  psDayVid=vidFind(vm,r.date,0);
   const chips=names.length
     ? '<div class="ps-chiprow">'+names.map(n=>'<span class="ps-chip">'+esc(n)+'</span>').join('')+'</div>'
     : '<div class="rs-warn">이 날짜의 기록이 없습니다.</div>';
@@ -2493,8 +2704,10 @@ function psRenderDate(r){
       pts+=x.pts;
       return '<tr><td class="ps-name">'+esc(x.name)+'</td>'+psCells(x.totals,x.pts,1,maxes)+'</tr>';
     }).join('');
+    const gv=vidFind(vm,r.date,gp.game);
     return '<div class="ps-gtitle" style="background:'+esc(c)+';color:'+rsFg(c)+'">'+
-      gp.game+'게임 · '+esc(gp.team)+'팀</div>'+
+      '<span>'+gp.game+'게임 · '+esc(gp.team)+'팀</span>'+
+      (gv?vidLink(gv,'영상','ps-ytg'):'')+'</div>'+
       '<div class="rs-tblwrap"><table class="ps-tbl"><thead>'+psHead('')+'</thead><tbody>'+body+'</tbody>'+
       '<tfoot><tr><td class="ps-name">합계</td>'+psCells(tot,pts,1)+'</tr></tfoot></table></div>';
   }).join('');
@@ -2502,9 +2715,10 @@ function psRenderDate(r){
   openModal(
     '<div class="rs-hd"><h3>📈 '+esc(r.date)+(r.day?' ('+esc(r.day)+')':'')+'</h3>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+rotateBtnHtml()+
+    (psDayVid?'<button class="rs-tool vid" onclick="psOpenDayVid()">▶ 영상 보기</button>':'')+
     '<button class="rs-tool" onclick="psOpenCalendar()">📅 다른 날짜</button>'+
     '<button class="rs-tool" onclick="psRenderSummary()">← 목록으로</button></div></div>'+
-    '<div class="ps-note"><b>참석자 '+names.length+'명</b></div>'+chips+
+    '<div class="ps-note"><b>참석자 '+names.length+'명</b> (게스트 포함)</div>'+chips+
     '<p class="ps-note">아래 게임별 표에서 '+
     '<span class="ps-top" style="padding:1px 7px;border-radius:5px">초록색</span>은 팀내 최고 수치, '+
     '<span class="ps-bad" style="padding:1px 7px;border-radius:5px">빨간색</span>은 팀내 최다 턴오버·반칙입니다. '+
@@ -2522,7 +2736,17 @@ function psRenderDate(r){
 }
 
 /* ===== 시작 ===== */
+/* 첫 로딩 화면 닫기 (데이터가 준비되면 호출) */
+function hideSplash(){
+  const el=document.getElementById('splash');
+  if(!el||el.classList.contains('gone'))return;
+  // 캐시로 화면이 이미 완성된 경우(=아주 이른 시점)에는 페이드 없이 바로 치운다
+  if(performance.now()<450){el.remove();return}
+  el.classList.add('gone');
+  setTimeout(()=>{if(el.parentNode)el.parentNode.removeChild(el)},450);
+}
 function showInitError(){
+  hideSplash();
   const c=document.getElementById('daysContainer');
   if(!c)return;
   c.innerHTML='<div style="padding:14px;text-align:center;color:#c0392b;font-size:.85rem">'+
@@ -2535,14 +2759,17 @@ function retryInit(){
   loadInit().then(r=>{if(!(r&&r.ok)&&!dataReady)showInitError()});
 }
 (function boot(){
-  // 1) 캐시가 있으면 즉시 렌더 → 체감 로딩 0초
+  // 1) 캐시가 있으면 즉시 렌더 → 체감 로딩 0초 (로딩 화면도 바로 닫는다)
   const cached=readCache();
-  if(cached)applyInit(cached);
+  if(cached){applyInit(cached);hideSplash()}
 
   // 2) <head> 에서 이미 시작해 둔 요청 결과로 최신화
   loadInit(window.__initReq).then(r=>{
     if(!(r&&r.ok)&&!dataReady)showInitError();
+    hideSplash();
   });
+  // 통신이 아주 느려도 8초 뒤에는 화면을 연다 (그 뒤엔 스켈레톤이 보인다)
+  setTimeout(hideSplash,8000);
 
   // 3) Service Worker 등록 (HTTPS 환경에서만 동작, 아니면 조용히 건너뜀)
   registerSW();
