@@ -52,19 +52,20 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .top-btn .tb-ic{line-height:1}
   .top-btn .tb-tx-s{display:none}
   .top-btn.icon-only .tb-tx,.top-btn.icon-only .tb-tx-s{display:none}
-  /* 좀은 화면: 메뉴 6개를 한 줄에 (텍스트 축약 + 균등 분할) */
+  /* 좁은 화면: 이모지 + 짧은 이름을 '한 줄'로 두고 폭만 균등하게 나눈다 */
   @media(max-width:620px){
     .top-bar{gap:4px;justify-content:space-between}
-    .top-btn{flex:1 1 0;min-width:0;gap:3px;padding:7px 4px;border-radius:9px;font-size:.68rem}
+    .top-btn{flex:1 1 0;min-width:0;gap:3px;padding:9px 4px;border-radius:9px;
+      font-size:clamp(.6rem,2.6vw,.74rem)}
+    .top-btn .tb-ic{font-size:.95em}
     .top-btn .tb-tx{display:none}
     .top-btn .tb-tx-s{display:inline}
-    .top-btn.icon-only{flex:0 0 auto;padding:7px 10px;font-size:.9rem}
+    .top-btn.icon-only{flex:0 0 auto;padding:9px 11px;font-size:.95rem}
   }
-  /* 더 좁은 화면: 아이콘 위 / 글자 아래로 쌓아 폭을 줄인다 */
-  @media(max-width:430px){
-    .top-btn{flex-direction:column;gap:2px;padding:6px 3px;font-size:clamp(.5rem,2.5vw,.64rem)}
-    .top-btn .tb-ic{font-size:1.05rem}
-    .top-btn.icon-only{padding:6px 9px;font-size:1.05rem}
+  /* 아주 좁은 화면(345px 이하): 이모지를 빼서 글자 크기를 지킨다 (관리자 아이콘은 유지) */
+  @media(max-width:345px){
+    .top-btn:not(.icon-only) .tb-ic{display:none}
+    .top-btn{gap:0;padding:9px 3px}
   }
   .card{background:var(--white);max-width:600px;margin:0 auto;border-radius:20px;box-shadow:var(--shadow);overflow:hidden}
 
@@ -356,10 +357,23 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   /* ===== 화면 회전(가로 보기) ===== */
   body.rs-rot{overflow:hidden}
   body.rs-rot #modal{padding:0}
-  body.rs-rot .modal{position:fixed;top:50%;left:50%;width:100vh;height:100vw;width:100dvh;height:100dvw;max-width:none;max-height:none;border-radius:0;padding:14px 16px;overflow-y:auto;transform:translate(-50%,-50%) rotate(90deg);transform-origin:center center}
+  /* 크기는 JS 가 실제로 보이는 영역을 재서 --rot-w/--rot-h 로 넣어준다.
+     카톡·인스타 등 인앱 브라우저는 100vh/100dvh 가 실제 화면과 달라 화면이 잘려 보인다. */
+  body.rs-rot .modal{position:fixed;top:50%;left:50%;width:100vh;height:100vw;width:100dvh;height:100dvw;
+    width:var(--rot-w,100dvh);height:var(--rot-h,100dvw);
+    max-width:none;max-height:none;border-radius:0;padding:14px 16px;overflow-y:auto;
+    transform:translate(-50%,-50%) rotate(90deg);transform-origin:center center}
   body.rs-rot #alertLayer .modal{position:static;width:100%;height:auto;max-width:400px;transform:none;border-radius:16px;padding:22px}
+  /* 가로 보기에서는 선수 스탯 표를 촘촘하게 그려 한 화면에 최대한 담는다 */
+  body.rs-rot .modal{padding:12px}
+  body.rs-rot .ps-tbl{font-size:.7rem}
+  body.rs-rot .ps-tbl th{font-size:.58rem}
+  body.rs-rot .ps-tbl th,body.rs-rot .ps-tbl td{padding:4px 4px}
+  body.rs-rot .ps-tbl .ps-name{min-width:64px}
   body.rs-rot .toast,body.rs-rot .toast.show{top:50%;bottom:auto;left:auto;right:26px;transform:translateY(-50%) rotate(90deg)}
-  body.rs-rot #alertLayer{top:50%;left:50%;right:auto;bottom:auto;width:100vh;height:100vw;width:100dvh;height:100dvw;transform:translate(-50%,-50%) rotate(90deg)}
+  body.rs-rot #alertLayer{top:50%;left:50%;right:auto;bottom:auto;width:100vh;height:100vw;width:100dvh;height:100dvw;
+    width:var(--rot-w,100dvh);height:var(--rot-h,100dvw);
+    transform:translate(-50%,-50%) rotate(90deg)}
 
   /* ===== 선수 스탯 ===== */
   .ps-tbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
@@ -409,6 +423,15 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .ps-cal .ps-cd.off{opacity:.28;cursor:default}
   .ps-cal.pick .ps-cd.off:hover{background:none}
   .ps-cal .ps-cd.sel{outline:2px solid var(--green);outline-offset:-2px;font-weight:800}
+
+  /* 기기를 실제로 가로로 돌린 경우(안드로이드 전체화면 방식)에도 같은 압축을 적용 */
+  @media(orientation:landscape) and (max-height:540px){
+    .modal{padding:12px}
+    .ps-tbl{font-size:.7rem}
+    .ps-tbl th{font-size:.58rem}
+    .ps-tbl th,.ps-tbl td{padding:4px 4px}
+    .ps-tbl .ps-name{min-width:64px}
+  }
 
   /* 작성되는 날짜 */
   .rs-dateline{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:var(--green-light);border:1.5px solid #c6ddc6;border-radius:11px;padding:11px 14px;margin-bottom:14px}
@@ -547,8 +570,12 @@ function openModal(html,wide){
   box.innerHTML=html;
   document.getElementById('modal').classList.add('show');
 }
+/* 지금 열려 있는 모달을 '그대로 다시 그리는' 함수.
+   화면이 가로로 돌아갔을 때 레이아웃을 새 크기로 다시 계산하기 위해 쓴다. */
+let _modalRender=null;
 function closeModal(){
   _statusOpen=false;
+  _modalRender=null;
   if(typeof rsRotOff==='function')rsRotOff();   // 가로 보기 상태로 남지 않도록
   document.getElementById('modal').classList.remove('show');
 }
@@ -1932,6 +1959,7 @@ function rsTableHtml(ti){
 }
 function rsRenderSheet(){
   rsView='sheet';
+  _modalRender=rsRenderSheet;
   const wide=rsIsWide();
   rsWideMode=wide;
   if(wide)rsTab=0;
@@ -1983,16 +2011,27 @@ function rsRenderSheet(){
   );
   rsSetMode(rsMode);
 }
-/* 창 크기가 모바일↔PC 경계를 넘으면 레이아웃을 다시 그린다 */
+/* 창 크기가 바뀌면(모바일↔PC 경계, 화면 회전) 열려 있는 모달을 다시 그린다.
+   기기를 가로로 돌린 직후 레이아웃이 옛 크기 그대로 남는 것을 막는다. */
 let _rsResizeTimer=null;
-window.addEventListener('resize',()=>{
-  if(rsView!=='sheet')return;
+function _relayoutModal(){
   if(!document.getElementById('modal').classList.contains('show'))return;
+  if(_modalRender===rsRenderSheet){
+    if(rsIsWide()!==rsWideMode)rsRenderSheet();   // 기록지는 경계를 넘을 때만
+    return;
+  }
+  if(_modalRender)_modalRender();
+}
+function _onViewportChange(){
+  if(typeof rsRotOn!=='undefined'&&rsRotOn&&!rsRotNative)rsRotSizeApply();
   clearTimeout(_rsResizeTimer);
-  _rsResizeTimer=setTimeout(()=>{
-    if(rsView==='sheet'&&rsIsWide()!==rsWideMode)rsRenderSheet();
-  },200);
-});
+  _rsResizeTimer=setTimeout(_relayoutModal,200);
+}
+window.addEventListener('resize',_onViewportChange);
+window.addEventListener('orientationchange',_onViewportChange);
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',_onViewportChange);
+}
 /* 좁은 화면에서만 노출되는 가로 보기 버튼 (기록지·선수 스탯 공용) */
 function rotateBtnHtml(){
   if(window.innerWidth>=900)return '';
@@ -2279,27 +2318,56 @@ function rsNextGame(){
 /* ===== 화면 회전 (가로 보기) =====
  *  안드로이드 크롬: 전체화면 + 방향 잠금(네이티브)
  *  iOS 사파리: 방향 잠금 API 자체가 없으므로 CSS 로 화면을 90도 돌린다 */
+/* 카톡·인스타·라인 등 '앱 안에서 열리는 브라우저'.
+   전체화면·방향잠금을 흉내만 내고 실제로는 동작하지 않아, 화면이 잘려 보인다.
+   그래서 이 환경에서는 처음부터 CSS 회전만 쓴다. */
+function rsIsInApp(){
+  return /KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|FB_IAB|Line\/|DaumApps|; wv\)/i.test(navigator.userAgent||'');
+}
 function rsToggleRotate(){
   if(rsRotOn){rsRotOff();return}
   const el=document.documentElement;
   const req=el.requestFullscreen||el.webkitRequestFullscreen;
   const lockable=window.screen&&screen.orientation&&screen.orientation.lock;
-  if(req&&lockable){
+  if(req&&lockable&&!rsIsInApp()){
     Promise.resolve(req.call(el))
       .then(()=>screen.orientation.lock('landscape'))
       .then(()=>{rsRotOn=true;rsRotNative=true;rsRotBtnLabel();toast('가로 모드','success')})
       .catch(()=>{
-        try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen()}catch(e){}
-        rsCssRotate();
+        // 전체화면이 완전히 풀린 뒤에 CSS 회전으로 넘어간다
+        // (풀리는 도중에 크기를 재면 화면 절반만 그려진다)
+        let done=false;
+        const go=()=>{if(done)return;done=true;setTimeout(rsCssRotate,60)};
+        try{
+          if(document.fullscreenElement&&document.exitFullscreen){
+            Promise.resolve(document.exitFullscreen()).then(go,go);
+            setTimeout(go,400);   // 응답이 없어도 넘어간다
+          }else go();
+        }catch(e){go()}
       });
   }else{
     rsCssRotate();
   }
 }
+/* 지금 실제로 보이는 영역을 재서 회전된 화면의 크기로 넣는다.
+   회전했으므로 '가로 = 화면 높이', '세로 = 화면 너비' 가 된다. */
+function rsRotSizeApply(){
+  const vv=window.visualViewport;
+  const de=document.documentElement;
+  const w=Math.round((vv&&vv.width)||de.clientWidth||window.innerWidth);
+  const h=Math.round((vv&&vv.height)||de.clientHeight||window.innerHeight);
+  if(!w||!h)return;
+  document.body.style.setProperty('--rot-w',h+'px');
+  document.body.style.setProperty('--rot-h',w+'px');
+}
 function rsCssRotate(){
+  rsRotSizeApply();
   document.body.classList.add('rs-rot');
   rsRotOn=true;rsRotNative=false;
   rsRotBtnLabel();
+  // 인앱 브라우저는 주소창·툴바가 늦게 접혀 크기가 한 번 더 바뀐다
+  setTimeout(rsRotSizeApply,120);
+  setTimeout(rsRotSizeApply,500);
   toast('가로 보기 (버튼을 다시 누르면 해제)','success');
 }
 function rsRotOff(){
@@ -2307,6 +2375,8 @@ function rsRotOff(){
     try{if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock()}catch(e){}
     try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen()}catch(e){}
   }
+  document.body.style.removeProperty('--rot-w');
+  document.body.style.removeProperty('--rot-h');
   document.body.classList.remove('rs-rot');
   rsRotOn=false;rsRotNative=false;
   rsRotBtnLabel();
@@ -2496,6 +2566,7 @@ function psSumCells(p,ths){
 function psRenderSummary(){
   const r=psSummary;
   if(!r){psOpenSummary();return}   // 개인 스탯부터 연 경우엔 목록을 새로 불러온다
+  _modalRender=psRenderSummary;
 
   // 서버 집계를 이름으로 찾아쓰고, 회원 명단(게스트 제외)을 기준으로 표를 만든다
   const byName={};
@@ -2571,6 +2642,12 @@ async function psPlayer(name){
   try{
     const r=await fetchJsonp(SCRIPT_URL,{action:'stats',mode:'player',name});
     if(!r||!r.ok){toast('불러오기 실패','error');psRenderSummary();return}
+    psRenderPlayer(name,r);
+  }catch(e){toast('통신 실패','error');psRenderSummary()}
+}
+/* 받아 둔 데이터로 개인 기록 화면을 그린다 (회전 시 다시 그릴 때도 이 함수를 쓴다) */
+function psRenderPlayer(name,r){
+    _modalRender=()=>psRenderPlayer(name,r);
     // g = [날짜, 진행일, 게임, 팀, 유니폼색, ...스탯13, 득점]
     const gs=r.games||[];
     const vm=vidMap(r.videos);
@@ -2609,7 +2686,6 @@ async function psPlayer(name){
       '<button class="rs-tool" onclick="closeModal()">닫기</button></div>',
       true
     );
-  }catch(e){toast('통신 실패','error');psRenderSummary()}
 }
 
 /* ===== 날짜별 보기 (캘린더) ===== */
@@ -2670,6 +2746,7 @@ async function psPickDate(ds){
 let psDayVid='';
 function psOpenDayVid(){if(psDayVid)window.open(psDayVid,'_blank','noopener')}
 function psRenderDate(r){
+  _modalRender=()=>psRenderDate(r);
   const names=r.names||[];
   const vm=vidMap(r.videos);
   psDayVid=vidFind(vm,r.date,0);
