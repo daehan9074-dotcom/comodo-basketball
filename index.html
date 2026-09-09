@@ -342,7 +342,13 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .rs-tbl .rs-name{position:sticky;left:0;z-index:2;min-width:84px;width:84px;max-width:84px;text-align:left;background:#fff;border-right:2px solid #c9c3ba}
   .rs-tbl thead .rs-name{z-index:4}
   .rs-tbl tfoot .rs-name{z-index:3;background:#efece5}
-  .rs-nbtn{width:100%;background:none;border:none;font-family:inherit;font-size:.84rem;font-weight:700;color:var(--text);text-align:left;padding:2px 7px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rs-nbtn{width:100%;display:flex;align-items:center;gap:3px;background:none;border:none;font-family:inherit;font-size:.84rem;font-weight:700;color:var(--text);text-align:left;padding:2px 7px;cursor:pointer;overflow:hidden;white-space:nowrap}
+  .rs-nbtn .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  /* 게스트 표시 */
+  .rs-g{flex:0 0 auto;display:inline-block;font-size:.56rem;font-weight:800;line-height:1.6;
+    background:#f3ece0;color:#8a6a00;border:1px solid #e0cfa8;border-radius:100px;padding:0 3px;margin-left:1px;vertical-align:middle}
+  .rs-pchip.guest{border-style:dashed}
+  .rs-tbl.has-guest .rs-name{min-width:104px;width:104px;max-width:104px}
   .rs-nbtn:hover{color:var(--green);text-decoration:underline}
   .rs-cell{min-width:48px;height:var(--rs-rowh,42px);cursor:pointer;font-size:var(--rs-fs,1rem);font-weight:800;background:#fff;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:background .12s}
   .rs-cell:active{background:#cfe8cf}
@@ -441,6 +447,7 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   body.rs-rot .rs-tbl th.rs-code,body.rs-land .rs-tbl th.rs-code{font-size:.66rem}
   body.rs-rot .rs-cell,body.rs-land .rs-cell{min-width:40px;height:var(--rs-rowh,34px);font-size:var(--rs-fs,.92rem)}
   body.rs-rot .rs-tbl .rs-name,body.rs-land .rs-tbl .rs-name{min-width:72px;width:72px;max-width:72px}
+  body.rs-rot .rs-tbl.has-guest .rs-name,body.rs-land .rs-tbl.has-guest .rs-name{min-width:92px;width:92px;max-width:92px}
   body.rs-rot .rs-nbtn,body.rs-land .rs-nbtn{padding:6px 6px;font-size:.78rem}
 
   /* ===== 선수 스탯 ===== */
@@ -1701,14 +1708,14 @@ function rsRenderSetup(){
       '<div class="rs-card">'+
         '<h5><span class="rs-chip" style="background:#eee;color:#444">'+esc(t.label)+'팀</span>'+
         '<span style="font-weight:600;color:#777;font-size:.82rem">'+t.members.length+'명</span>'+
-        '<button class="rs-mini" onclick="rsSetupAdd('+i+')">＋ 선수</button>'+
+        '<button class="rs-mini" onclick="rsSetupAdd('+i+')">＋ 선수·게스트</button>'+
         (rsTeams.length>2?'<button class="rs-mini del" onclick="rsRemoveTeam('+i+')" title="팀 제거">팀 제거</button>':'')+
         '</h5>'+
         '<div class="rs-plist">'+
         (t.members.map((m,mi)=>
-          '<span class="rs-pchip">'+posTag(m.position)+esc(m.name)+
+          '<span class="rs-pchip'+(rsIsGuest(m)?' guest':'')+'">'+posTag(m.position)+esc(m.name)+rsGuestTag(m)+
           '<button onclick="rsSetupDel('+i+','+mi+')" title="빼기">✕</button></span>').join('')
-          ||'<span class="rs-empty">＋ 선수 를 눌러 명단을 입력하세요</span>')+
+          ||'<span class="rs-empty">＋ 선수·게스트 를 눌러 명단을 입력하세요</span>')+
         '</div>'+
       '</div>'
     ).join('');
@@ -2016,7 +2023,8 @@ function rsTableHtml(ti){
         'onclick="rsBump('+ti+','+mi+',\''+c.k+'\')">'+v+'</td>';
     }).join('');
     return '<tr><td class="rs-name">'+
-      '<button class="rs-nbtn" onclick="rsPlayerMenu('+ti+','+mi+')" title="팀 이동 / 제외">'+esc(m.name)+'</button>'+
+      '<button class="rs-nbtn" onclick="rsPlayerMenu('+ti+','+mi+')" title="팀 이동 / 제외">'+
+      '<span class="nm">'+esc(m.name)+'</span>'+rsGuestTag(m)+'</button>'+
       '</td>'+cells+'</tr>';
   }).join('')||'<tr><td class="rs-name">-</td><td colspan="'+RS_VIEW.length+'" style="padding:16px;color:#aaa;font-size:.85rem">선수를 추가해 주세요</td></tr>';
 
@@ -2027,7 +2035,8 @@ function rsTableHtml(ti){
     return '<td id="rt-'+ti+'-'+c.k+'">'+(tot[c.k]||0)+'</td>';
   }).join('');
 
-  return '<div class="rs-tblwrap"><table class="rs-tbl">'+
+  const anyGuest=t.members.some(rsIsGuest);
+  return '<div class="rs-tblwrap"><table class="rs-tbl'+(anyGuest?' has-guest':'')+'">'+
     '<thead>'+
       '<tr style="'+hs+'"><th class="rs-name rs-code" style="'+hs+'">'+esc(t.label)+'팀</th>'+head1+'</tr>'+
       '<tr style="'+hs+'"><th class="rs-name" style="'+hs+'">선 수</th>'+head2+'</tr>'+
@@ -2070,7 +2079,7 @@ function rsRenderSheet(){
         '</div>'+
         '<div class="rs-row tight">'+
           rotateBtnHtml()+
-          '<button class="rs-tool" onclick="rsAddPlayerDialog()">＋ 선수 추가</button>'+
+          '<button class="rs-tool" onclick="rsAddPlayerDialog()">＋ 선수·게스트</button>'+
           '<button class="rs-tool go" id="rsSaveBtn" onclick="rsSaveGame()">💾 게임 저장</button>'+
         '</div>'+
       '</div>'+
@@ -2301,22 +2310,61 @@ function rsSetupDel(ti,mi){
   rsSaveDraft();
   rsRenderSetup();
 }
+/* 회원 명단에 없으면 게스트로 본다 (팀 생성기·팀배정 시트와 같은 기준) */
+function rsIsGuest(m){return !!(m&&(m.isGuest||m.memberType==='게스트'))}
+function rsGuestTag(m){return rsIsGuest(m)?'<span class="rs-g" title="게스트">게</span>':''}
+
+let rsAddType='member',rsAddTeamSel=0,rsAddKeep='';
 function rsAddPlayerDialog(preTeam){
-  const sel=(preTeam==null)?rsMatch[rsTab]:preTeam;
-  const opts=rsTeams.map((t,i)=>'<option value="'+i+'"'+(i===sel?' selected':'')+'>'+esc(t.label)+'팀</option>').join('');
+  rsAddType='member';
+  rsAddTeamSel=(preTeam==null)?rsMatch[rsTab]:preTeam;
+  rsAddKeep='';
+  rsAddRender();
+}
+/* 회원 ↔ 게스트 전환. 입력하던 이름과 고른 팀은 그대로 둔다 */
+function rsAddSetType(g){
+  const nm=document.getElementById('rsNewName');
+  rsAddKeep=nm?String(nm.value||''):'';
+  const ts=document.getElementById('rsNewTeam');
+  if(ts)rsAddTeamSel=parseInt(ts.value,10)||0;
+  rsAddType=g?'guest':'member';
+  rsAddRender();
+}
+function rsAddRender(){
+  const guest=(rsAddType==='guest');
+  const opts=rsTeams.map((t,i)=>'<option value="'+i+'"'+(i===rsAddTeamSel?' selected':'')+'>'+esc(t.label)+'팀</option>').join('');
   const listed=currentMembers.map(m=>'<option value="'+esc(m.name)+'"></option>').join('');
+  const val=' value="'+esc(rsAddKeep)+'"';
   popupHtml(
-    '<h3>선수 추가</h3>'+
+    '<h3>선수 · 게스트 추가</h3>'+
+    '<div class="field"><label class="main-label">구분</label>'+
+    '<div class="rs-row">'+
+      '<button class="rs-mbtn'+(guest?'':' on')+'" onclick="rsAddSetType(0)">회원</button>'+
+      '<button class="rs-mbtn'+(guest?' on':'')+'" onclick="rsAddSetType(1)">게스트</button>'+
+    '</div></div>'+
     '<div class="field"><label class="main-label">이름</label>'+
-    '<input type="text" id="rsNewName" list="rsMemList" autocomplete="off" placeholder="이름 입력 또는 선택" />'+
-    '<datalist id="rsMemList">'+listed+'</datalist></div>'+
+    (guest
+      ? '<input type="text" id="rsNewName" autocomplete="off" placeholder="게스트 이름"'+val+' />'
+      : '<input type="text" id="rsNewName" list="rsMemList" autocomplete="off" placeholder="이름 입력 또는 선택"'+val+' />'+
+        '<datalist id="rsMemList">'+listed+'</datalist>')+
+    '</div>'+
+    (guest
+      ? '<div class="field"><label class="main-label">포지션</label>'+
+        '<select id="rsNewPos"><option value="가드">가드</option><option value="포워드">포워드</option>'+
+        '<option value="센터">센터</option></select></div>'
+      : '')+
     '<div class="field"><label class="main-label">팀</label><select id="rsNewTeam">'+opts+'</select></div>'+
+    '<p class="pop-sub" style="margin-top:2px">'+
+      (guest
+        ? '회원 명단에 없는 사람입니다. 기록지에 <b>게</b> 표시로 구분됩니다.'
+        : '명단에 없는 이름을 넣으면 자동으로 게스트가 됩니다.')+'</p>'+
     '<div class="modal-actions">'+
       '<button class="btn-secondary" onclick="closePopup()">취소</button>'+
       '<button class="btn-primary" onclick="rsAddPlayer()">추가</button>'+
     '</div>'
   );
-  setTimeout(()=>{const el=document.getElementById('rsNewName');if(el)el.focus()},80);
+  setTimeout(()=>{const el=document.getElementById('rsNewName');if(el){el.focus();
+    try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){}}},80);
 }
 function rsAddPlayer(){
   const nameEl=document.getElementById('rsNewName');
@@ -2329,12 +2377,20 @@ function rsAddPlayer(){
     }
   }
   const known=currentMembers.find(m=>m.name===name);
-  rsTeams[ti].members.push({name,position:(known&&known.position)||'',memberType:(known&&known.memberType)||'게스트'});
+  // 게스트를 고르지 않았더라도 회원 명단에 없으면 게스트로 넣는다
+  const guest=(rsAddType==='guest')||!known;
+  const posEl=document.getElementById('rsNewPos');
+  rsTeams[ti].members.push({
+    name:name,
+    position:guest?(((posEl&&posEl.value)||'가드')):((known&&known.position)||''),
+    memberType:guest?'게스트':((known&&known.memberType)||''),
+    isGuest:guest
+  });
   rsGet(name);
   closePopup();
   rsSaveDraft();
   if(rsView==='sheet')rsRenderSheet(); else rsRenderSetup();
-  toast(name+' 추가됨','success');
+  toast(name+(guest?' (게스트) 추가됨':' 추가됨'),'success');
 }
 
 /* ===== 저장 ===== */
