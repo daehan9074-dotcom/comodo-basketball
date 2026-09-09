@@ -277,6 +277,7 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
 
   /* ===== 넓은 모달 (기록지 / 스탯) ===== */
   .modal.wide{max-width:1140px}
+  .modal.wide.rs-sheet{max-height:93vh}
   .ld{text-align:center;color:#888;padding:34px 0;font-size:.9rem}
   .ld::before{content:'';display:block;width:36px;height:36px;margin:0 auto 12px;
     background:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23e07b39'/%3E%3Cg fill='none' stroke='%232a1a12' stroke-width='4.5' stroke-linecap='round'%3E%3Ccircle cx='50' cy='50' r='45'/%3E%3Cpath d='M50 5V95'/%3E%3Cpath d='M5 50H95'/%3E%3Cpath d='M19 16C36 32 36 68 19 84'/%3E%3Cpath d='M81 16C64 32 64 68 81 84'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;animation:spin 1.2s linear infinite}
@@ -287,6 +288,10 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
 
   /* 기록지 상단 고정 툴바 */
   .rs-toolbar{position:sticky;top:0;z-index:20;background:#fff;margin:0 -26px 8px;padding:8px 26px 10px;border-bottom:1.5px solid #eee}
+  .rs-toolbar .rs-hd{margin-bottom:8px}
+  .rs-note-help{margin-top:9px}
+  .rs-foot{text-align:center;margin-top:12px}
+  .rs-hd .rs-x{padding:6px 14px;font-size:.8rem;margin-left:auto}
   .rs-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
   .rs-row+.rs-row{margin-top:7px}
   /* 점수판 + 입력/취소 묶음 */
@@ -337,9 +342,9 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .rs-tbl .rs-name{position:sticky;left:0;z-index:2;min-width:84px;width:84px;max-width:84px;text-align:left;background:#fff;border-right:2px solid #c9c3ba}
   .rs-tbl thead .rs-name{z-index:4}
   .rs-tbl tfoot .rs-name{z-index:3;background:#efece5}
-  .rs-nbtn{width:100%;background:none;border:none;font-family:inherit;font-size:.84rem;font-weight:700;color:var(--text);text-align:left;padding:9px 7px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rs-nbtn{width:100%;background:none;border:none;font-family:inherit;font-size:.84rem;font-weight:700;color:var(--text);text-align:left;padding:2px 7px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .rs-nbtn:hover{color:var(--green);text-decoration:underline}
-  .rs-cell{min-width:48px;height:42px;cursor:pointer;font-size:1rem;font-weight:800;background:#fff;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:background .12s}
+  .rs-cell{min-width:48px;height:var(--rs-rowh,42px);cursor:pointer;font-size:var(--rs-fs,1rem);font-weight:800;background:#fff;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:background .12s}
   .rs-cell:active{background:#cfe8cf}
   .rs-cell.zero{color:#cdc8c0;font-weight:600}
   .rs-cell.hit{animation:rsHit .35s ease}
@@ -396,6 +401,23 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
     width:var(--rot-w,100dvh);height:var(--rot-h,100dvw);
     transform:translate(-50%,-50%) rotate(90deg)}
 
+  /* ===== PC(두 팀 표를 한 번에 보는 화면) 툴바 압축 =====
+     양 팀 기록지가 한 화면에 다 들어가도록 위쪽 메뉴가 차지하는 높이를 줄인다. */
+  @media(min-width:900px){
+    .rs-toolbar{padding-top:6px;padding-bottom:8px}
+    .rs-toolbar .rs-hd{margin-bottom:6px}
+    .rs-top{flex-direction:row;align-items:stretch;gap:8px}
+    .rs-top>.rs-score{flex:1.3}
+    .rs-top>.rs-modes{flex:1;flex-wrap:nowrap}
+    .rs-top+.rs-tools{margin-top:7px}
+    .rs-tools{flex-direction:row;gap:8px}
+    .rs-tools>.rs-row{flex:1}
+    .rs-tbl th{padding:4px 3px}
+    .rs-tbl tfoot td{height:32px}
+    .rs-note-help{font-size:.75rem;margin-top:6px}
+    .rs-foot{margin-top:8px}
+  }
+
   /* ===== 가로 화면에서 기록지 툴바 압축 =====
      회전(body.rs-rot) 이든 기기를 실제로 돌린 경우(body.rs-land) 든
      툴바를 두 줄로 줄여 기록지 표가 가려지지 않게 한다. */
@@ -417,7 +439,7 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   /* 표도 촘촘하게 그려 한 화면에 더 담는다 */
   body.rs-rot .rs-tbl th,body.rs-land .rs-tbl th{font-size:.6rem;padding:3px 2px;min-width:40px}
   body.rs-rot .rs-tbl th.rs-code,body.rs-land .rs-tbl th.rs-code{font-size:.66rem}
-  body.rs-rot .rs-cell,body.rs-land .rs-cell{min-width:40px;height:34px;font-size:.92rem}
+  body.rs-rot .rs-cell,body.rs-land .rs-cell{min-width:40px;height:var(--rs-rowh,34px);font-size:var(--rs-fs,.92rem)}
   body.rs-rot .rs-tbl .rs-name,body.rs-land .rs-tbl .rs-name{min-width:72px;width:72px;max-width:72px}
   body.rs-rot .rs-nbtn,body.rs-land .rs-nbtn{padding:6px 6px;font-size:.78rem}
 
@@ -2028,8 +2050,10 @@ function rsRenderSheet(){
 
   openModal(
     '<div class="rs-toolbar">'+
-      '<div class="rs-hd" style="margin-bottom:8px"><h3 style="font-size:1.02rem">📝 기록지</h3>'+
-      '<span class="rs-sub">'+esc(rsDate)+' · '+esc(rsDay||'-')+' · '+rsGame+'게임</span></div>'+
+      '<div class="rs-hd"><h3 style="font-size:1.02rem">📝 기록지</h3>'+
+      '<span class="rs-sub">'+esc(rsDate)+' · '+esc(rsDay||'-')+' · '+rsGame+'게임</span>'+
+      // 넓은 화면에서는 닫기를 제목 줄로 올려 아래쪽 표가 들어갈 높이를 확보한다
+      (wide?'<button class="rs-tool rs-x" onclick="closeModal()">닫기</button>':'')+'</div>'+
       '<div class="rs-top">'+
         '<div class="rs-score" id="rsScore">'+rsScoreHtml()+'</div>'+
         '<div class="rs-row rs-modes">'+
@@ -2052,16 +2076,59 @@ function rsRenderSheet(){
       '</div>'+
     '</div>'+
     tables+
-    '<p class="ps-note rs-note-help" style="margin-top:9px">'+
+    '<p class="ps-note rs-note-help">'+
       '＋ 또는 －를 고른 뒤 칸을 누르면 개수가 오르내립니다. '+
       '<b>성공</b>을 누르면 <b>시도</b>도 자동으로 함께 올라갑니다. '+
       '선수 이름을 누르면 팀 이동·제외를 할 수 있습니다.'+
       (wide?'':' <b>위 점수판에서 팀을 누르면</b> 그 팀 기록지로 바뀝니다.')+'</p>'+
-    '<div style="text-align:center;margin-top:12px">'+
-    '<button class="rs-tool" onclick="closeModal()">닫기</button></div>',
+    (wide?'':'<div class="rs-foot">'+
+      '<button class="rs-tool" onclick="closeModal()">닫기</button></div>'),
     true
   );
+  const box=document.getElementById('modalBox');
+  if(box)box.classList.add('rs-sheet');
   rsSetMode(rsMode);
+  rsFitWide();
+}
+/* 두 팀 표를 한 번에 보는 화면(PC)에서, 아래쪽 팀 기록지가 잘리지 않도록
+   남는 높이에 맞춰 선수 행 높이를 줄인다. 그래도 모자라면 기존처럼 스크롤된다. */
+function rsFitWide(){
+  const box=document.getElementById('modalBox');
+  if(!box)return;
+  const note=box.querySelector('.rs-note-help');
+  const set=h=>{
+    if(h==null){box.style.removeProperty('--rs-rowh');box.style.removeProperty('--rs-fs');return}
+    box.style.setProperty('--rs-rowh',h+'px');
+    if(h<32)box.style.setProperty('--rs-fs','.88rem');
+    else box.style.removeProperty('--rs-fs');
+  };
+  set(null);
+  if(note)note.hidden=false;
+  if(!rsWideMode)return;
+  if(document.body.classList.contains('rs-rot')||document.body.classList.contains('rs-land'))return;
+  const wraps=[].slice.call(box.querySelectorAll('.rs-tblwrap'));
+  if(wraps.length<2)return;
+  let rows=0;
+  for(let i=0;i<wraps.length;i++){
+    const tb=wraps[i].querySelector('.rs-tbl tbody');
+    if(!tb)continue;
+    for(let j=0;j<tb.rows.length;j++){
+      if(tb.rows[j].querySelector('.rs-cell'))rows++;   // 선수가 없는 안내 행은 제외
+    }
+  }
+  if(rows<1)return;
+  const over=()=>box.scrollHeight-box.clientHeight;     // 실제로 넘치는 높이
+  if(over()<=0)return;                                  // 이미 다 들어간다
+  const MIN=24,MAX=42;
+  let h=MAX;
+  for(let k=0;k<8&&h>MIN;k++){
+    const o=over();
+    if(o<=0)break;
+    h=Math.max(MIN,h-Math.max(1,Math.ceil(o/rows)));
+    set(h);
+  }
+  // 행을 가장 낮게 줄여도 모자라면 아래 안내문을 접어 한 줄이라도 더 확보한다
+  if(over()>0&&note)note.hidden=true;
 }
 /* 창 크기가 바뀌면(모바일↔PC 경계, 화면 회전) 열려 있는 모달을 다시 그린다.
    기기를 가로로 돌린 직후 레이아웃이 옛 크기 그대로 남는 것을 막는다. */
@@ -2070,6 +2137,7 @@ function _relayoutModal(){
   if(!document.getElementById('modal').classList.contains('show'))return;
   if(_modalRender===rsRenderSheet){
     if(rsIsWide()!==rsWideMode)rsRenderSheet();   // 기록지는 경계를 넘을 때만
+    else rsFitWide();                            // 같은 모드면 높이만 다시 맞춘다
     return;
   }
   if(_modalRender)_modalRender();
