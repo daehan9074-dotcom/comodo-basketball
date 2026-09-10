@@ -2756,8 +2756,9 @@ function psRenderSummary(){
   // 서버 집계를 이름으로 찾아쓰고, 회원 명단(게스트 제외)을 기준으로 표를 만든다
   const byName={};
   (r.players||[]).forEach(p=>{byName[p.name]=p});
-  // 게스트는 누적 스탯 목록에서 빼고, 날짜별 보기에서는 그대로 남겨 둔다
-  const roster=currentMembers.filter(m=>!m.isGuest&&m.memberType!=='게스트');
+  // 게스트·휴활회원은 누적 스탯 목록에서 빼고, 날짜별 보기에서는 그대로 남겨 둔다
+  const roster=currentMembers.filter(m=>!m.isGuest&&m.memberType!=='게스트'
+    &&!m.isInactive&&m.memberType!=='휴활회원');
   const inRoster={};roster.forEach(m=>{inRoster[m.name]=1});
   const names=roster.length?roster.map(m=>m.name)
     :(r.players||[]).map(p=>p.name);            // 회원 명단을 못 불러왔을 때의 대비
@@ -2797,7 +2798,7 @@ function psRenderSummary(){
     '<p class="ps-note">선수마다 <b>실제 참석한 최근 '+PS_DAYS+'일</b>의 기록을 모아 <b>경기 1게임당 평균</b>으로 계산합니다. '+
     '평균 득점이 높은 순으로 정렬됩니다.<br>'+
     '최근 '+PS_ACTIVE_MONTHS+'개월 안에 기록이 없는 선수는 비워 둡니다. '+
-    '<b>게스트는 이 목록에서 빠지며</b>, 📅 날짜별 보기에서는 그대로 표시됩니다.'+
+    '<b>게스트·휴활회원은 이 목록에서 빠지며</b>, 📅 날짜별 보기에서는 그대로 표시됩니다.'+
     (r.activeFrom?' (기준일 '+esc(r.activeFrom)+' 이후)':'')+'<br>'+
     '<span class="ps-top" style="padding:1px 7px;border-radius:5px">초록색</span> = 해당 항목 상위 10% · '+
     '<span class="ps-bad" style="padding:1px 7px;border-radius:5px">빨간색</span> = 턴오버·반칙 상위 10% '+
