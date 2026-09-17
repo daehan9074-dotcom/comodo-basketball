@@ -106,7 +106,7 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .member-info .mi-row span{display:inline-flex;gap:4px}
   .member-info .mi-row b{color:var(--green);font-weight:700}
   .member-info .mi-badge{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:100px;font-size:.72rem;font-weight:700}
-  /* 회원 정보 + 오른쪽 '나의 스탯' 버튼 */
+  /* 회원 정보 + 오른쪽 '나의 기록' 버튼 */
   .member-info .mi-hd{display:flex;align-items:flex-start;gap:10px}
   .member-info .mi-body{flex:1 1 auto;min-width:0}
   .member-info .mi-stat{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;background:var(--green);border:none;
@@ -396,7 +396,7 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
     max-width:none;max-height:none;border-radius:0;padding:14px 16px;overflow-y:auto;
     transform:translate(-50%,-50%) rotate(90deg);transform-origin:center center}
   body.rs-rot #alertLayer .modal{position:static;width:100%;height:auto;max-width:400px;transform:none;border-radius:16px;padding:22px}
-  /* 가로 보기에서는 선수 스탯 표를 촘촘하게 그려 한 화면에 최대한 담는다 */
+  /* 가로 보기에서는 선수 기록 표를 촘촘하게 그려 한 화면에 최대한 담는다 */
   body.rs-rot .modal{padding:12px}
   body.rs-rot .ps-tbl{font-size:.7rem}
   body.rs-rot .ps-tbl th{font-size:.58rem}
@@ -450,13 +450,13 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   body.rs-rot .rs-tbl.has-guest .rs-name,body.rs-land .rs-tbl.has-guest .rs-name{min-width:92px;width:92px;max-width:92px}
   body.rs-rot .rs-nbtn,body.rs-land .rs-nbtn{padding:6px 6px;font-size:.78rem}
 
-  /* ===== 선수 스탯 ===== */
+  /* ===== 선수 기록 ===== */
   .ps-tbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
   .ps-note{font-size:.8rem;color:var(--label);margin-bottom:9px;line-height:1.55}
   .ps-tbl{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-size:.82rem}
   .ps-tbl th,.ps-tbl td{border-right:1px solid #e4e0d9;border-bottom:1px solid #e4e0d9;padding:6px 7px;text-align:center;white-space:nowrap}
   .ps-tbl th{background:var(--green);color:#fff;font-size:.68rem;font-weight:700;line-height:1.2;position:sticky;top:0;z-index:2}
-  /* 선수 스탯 표는 표 안에서 세로 스크롤 → 머리글(선수·참석일·경기·승-패…)이 위에 고정된다 */
+  /* 선수 기록 표는 표 안에서 세로 스크롤 → 머리글(선수·참석일·경기·승-패…)이 위에 고정된다 */
   .rs-tblwrap.ps-scroll{overflow:auto;max-height:72vh;max-height:72dvh}
   .ps-tbl .ps-name{position:sticky;left:0;z-index:3;background:#fff;text-align:left;min-width:82px;border-right:2px solid #c9c3ba;font-weight:700}
   .ps-tbl thead .ps-name{z-index:5;background:var(--green)}
@@ -473,7 +473,7 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .ps-wl{font-size:.72rem;color:#8a857d;font-weight:600}
   .ps-up{display:inline-block;margin-left:2px;font-size:.55em;color:#d9480f;vertical-align:.25em;line-height:1}
   .ps-up.ps-down{color:#1c7ed6}
-  /* PC: 선수 스탯 표가 가로로 잘리지 않도록 모달을 넓히고 표를 촘촘하게 */
+  /* PC: 선수 기록 표가 가로로 잘리지 않도록 모달을 넓히고 표를 촘촘하게 */
   @media(min-width:900px) and (min-height:541px){
     .modal.wide:has(.ps-tbl){max-width:min(1480px,97vw);padding:22px 20px}
     .ps-tbl{font-size:.78rem}
@@ -585,8 +585,8 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
 <div class="top-bar">
   <button class="top-btn" id="statusBtn"><span class="tb-ic">📊</span><span class="tb-tx">참가 현황</span><span class="tb-tx-s">참가현황</span></button>
   <button class="top-btn" id="teamBtn"><span class="tb-ic">🏀</span><span class="tb-tx">팀 생성기</span><span class="tb-tx-s">팀생성기</span></button>
-  <button class="top-btn" id="sheetBtn"><span class="tb-ic">📝</span><span class="tb-tx">기록지</span><span class="tb-tx-s">기록지</span></button>
-  <button class="top-btn" id="playerStatBtn"><span class="tb-ic">📈</span><span class="tb-tx">선수 스탯</span><span class="tb-tx-s">선수스탯</span></button>
+  <button class="top-btn" id="sheetBtn"><span class="tb-ic">📝</span><span class="tb-tx">기록 입력</span><span class="tb-tx-s">기록입력</span></button>
+  <button class="top-btn" id="playerStatBtn"><span class="tb-ic">📈</span><span class="tb-tx">선수 기록</span><span class="tb-tx-s">선수기록</span></button>
   <button class="top-btn icon-only" id="adminBtn" title="관리자" aria-label="관리자"><span class="tb-ic">⚙️</span><span class="tb-tx">관리자</span></button>
 </div>
 
@@ -893,7 +893,7 @@ function showMemberInfo(m){
     '</div>'+
     (badges?'<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'+badges+'</div>':'')+
     '</div>'+
-    '<button type="button" class="mi-stat" onclick="psMyStat()">📈 나의 스탯</button>'+
+    '<button type="button" class="mi-stat" onclick="psMyStat()">📈 나의 기록</button>'+
     '</div>'+
     notice;
   info.classList.add('show');
@@ -1352,7 +1352,7 @@ function renderTeamResult(){
     '<div style="font-size:.75rem;color:#4a7a4a;margin-top:8px;line-height:1.5">'+
     '저장 대상: <b>'+esc(tgTargetDate())+'</b> · '+esc(tgDay)+
     (tgSavedDate?' (불러온 내용을 수정합니다)':'')+'<br>'+
-    '저장하면 📝 기록지 메뉴에서 이 팀을 그대로 불러올 수 있습니다.</div></div>':'';
+    '저장하면 📝 기록 입력 메뉴에서 이 팀을 그대로 불러올 수 있습니다.</div></div>':'';
 
   // 분배 조건 (팀 배정과 대기 사이)
   const rtAll=[...getAttendees(tgDay),...collectGuests()];
@@ -1780,7 +1780,7 @@ function rsRenderSetup(){
       '<p class="ps-note">유니폼색은 기록지를 시작한 뒤 <b>🎽 유니폼색</b> 버튼에서 게임마다 바꿀 수 있습니다.</p>'+
       '<div class="modal-actions">'+
       '<button class="btn-secondary" onclick="rsAddTeam()">+ 팀 추가</button>'+
-      '<button class="btn-primary" onclick="rsStart()">▶ 기록지 시작</button></div>';
+      '<button class="btn-primary" onclick="rsStart()">▶ 기록 시작</button></div>';
   }else{
     teamsHtml=
       '<div class="rs-warn">불러온 팀이 없습니다.<br>'+
@@ -1791,7 +1791,7 @@ function rsRenderSetup(){
   }
 
   openModal(
-    '<div class="rs-hd"><h3>📝 기록지 입력</h3></div>'+
+    '<div class="rs-hd"><h3>📝 기록 입력</h3></div>'+
     rsDateLineHtml()+
     '<div class="tg-field"><label>진행일 (누르면 저장된 팀을 불러옵니다)</label>'+
     '<div class="tg-btn-row">'+dayBtns+pastBtn+'</div></div>'+
@@ -2101,7 +2101,7 @@ function rsRenderSheet(){
 
   openModal(
     '<div class="rs-toolbar">'+
-      '<div class="rs-hd"><h3 style="font-size:1.02rem">📝 기록지</h3>'+
+      '<div class="rs-hd"><h3 style="font-size:1.02rem">📝 기록 입력</h3>'+
       '<span class="rs-sub">'+esc(rsDate)+' · '+esc(rsDay||'-')+' · '+rsGame+'게임</span>'+
       // 넓은 화면에서는 닫기를 제목 줄로 올려 아래쪽 표가 들어갈 높이를 확보한다
       (wide?'<button class="rs-tool rs-x" onclick="closeModal()">닫기</button>':'')+'</div>'+
@@ -2212,7 +2212,7 @@ window.addEventListener('orientationchange',_onViewportChange);
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize',_onViewportChange);
 }
-/* 좁은 화면에서만 노출되는 가로 보기 버튼 (기록지·선수 스탯 공용) */
+/* 좁은 화면에서만 노출되는 가로 보기 버튼 (기록지·선수 기록 공용) */
 function rotateBtnHtml(){
   if(window.innerWidth>=900)return '';
   return '<button class="rs-tool" id="rsRotBtn" onclick="rsToggleRotate()">'+
@@ -2491,7 +2491,7 @@ async function rsVideoDialog(){
   popupHtml(
     '<h3>🎬 영상 링크</h3>'+
     '<p class="pop-sub">'+esc(rsDate)+(rsDay?' · '+esc(rsDay):'')+'<br>'+
-    '유튜브 주소를 붙여넣으면 <b>선수 스탯</b>과 <b>날짜별 보기</b>에서 ▶ 로 바로 열립니다.<br>'+
+    '유튜브 주소를 붙여넣으면 <b>선수 기록</b>과 <b>날짜별 보기</b>에서 ▶ 로 바로 열립니다.<br>'+
     '주소 끝에 <b>&t=1200</b> 처럼 초를 붙이면 그 시점부터 재생됩니다.</p>'+
     '<div class="field"><label class="main-label">적용 범위</label>'+
     '<select id="rsVidScopeSel" onchange="rsVidScopeChange()">'+
@@ -2666,7 +2666,7 @@ async function tgSaveTeams(){
       popupHtml(
         '<h3>✅ 저장 완료</h3>'+
         '<p class="pop-msg">저장되었습니다.\n'+esc(date+' '+tgDay+' 팀 배정 ('+(r.count||0)+'명)')+'</p>'+
-        '<p class="pop-sub">📝 기록지 메뉴에서 '+esc(tgDay)+'을(를) 누르면 이 팀을 불러옵니다.<br>'+
+        '<p class="pop-sub">📝 기록 입력 메뉴에서 '+esc(tgDay)+'을(를) 누르면 이 팀을 불러옵니다.<br>'+
         '같은 날짜로 다시 저장하면 기존 내용이 수정됩니다.</p>'+
         '<div class="modal-actions"><button class="btn-primary" onclick="closePopup()">확인</button></div>');
     }else{
@@ -2680,7 +2680,7 @@ async function tgSaveTeams(){
 }
 
 /* =========================================================
- *  3. 선수 스탯
+ *  3. 선수 기록
  * ========================================================= */
 const RS_IDX={};RS_KEYS.forEach((k,i)=>{RS_IDX[k]=i});
 const PS_DAYS=5;          // 참석일 기준 최근 5일
@@ -2730,16 +2730,16 @@ function psTeamMaxes(rowsOf){
 }
 
 async function psOpenSummary(){
-  openModal('<h3>📈 선수 스탯</h3><p class="ld">불러오는 중...</p>',true);
+  openModal('<h3>📈 선수 기록</h3><p class="ld">불러오는 중...</p>',true);
   try{
     const r=await fetchJsonp(SCRIPT_URL,{action:'stats',mode:'summary',days:PS_DAYS,activeMonths:PS_ACTIVE_MONTHS});
-    if(!r||!r.ok){openModal('<h3>📈 선수 스탯</h3><p class="ld">기록을 불러오지 못했습니다.</p>'+
+    if(!r||!r.ok){openModal('<h3>📈 선수 기록</h3><p class="ld">기록을 불러오지 못했습니다.</p>'+
       '<div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">닫기</button>'+
       '<button class="btn-primary" onclick="psOpenSummary()">다시 시도</button></div>',true);return}
     psSummary=r;
     psRenderSummary();
   }catch(e){
-    openModal('<h3>📈 선수 스탯</h3><p class="ld">통신에 실패했습니다.</p>'+
+    openModal('<h3>📈 선수 기록</h3><p class="ld">통신에 실패했습니다.</p>'+
       '<div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">닫기</button>'+
       '<button class="btn-primary" onclick="psOpenSummary()">다시 시도</button></div>',true);
   }
@@ -2854,7 +2854,7 @@ function psRenderSummary(){
   }).join('');
 
   openModal(
-    '<div class="rs-hd"><h3>📈 선수 스탯</h3><div style="display:flex;gap:6px">'+rotateBtnHtml()+
+    '<div class="rs-hd"><h3>📈 선수 기록</h3><div style="display:flex;gap:6px">'+rotateBtnHtml()+
     '<button class="rs-tool" onclick="psOpenCalendar()">📅 날짜별 보기</button></div></div>'+
     '<p class="ps-note">선수마다 <b>실제 참석한 최근 '+PS_DAYS+'일</b>의 기록을 모아 <b>경기 1게임당 평균</b>으로 계산합니다. '+
     '평균 득점이 높은 순으로 정렬됩니다.<br>'+
@@ -2879,7 +2879,7 @@ function psRenderSummary(){
   );
 }
 
-/* 이름 확인 뒤 '나의 스탯' 버튼 → 본인 게임 기록 바로 열기 */
+/* 이름 확인 뒤 '나의 기록' 버튼 → 본인 게임 기록 바로 열기 */
 function psMyStat(){
   if(!currentMember){toast('먼저 이름을 확인해 주세요','error');return}
   psPlayer(currentMember.name);
