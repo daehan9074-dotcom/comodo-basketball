@@ -456,6 +456,8 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .ps-tbl{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-size:.82rem}
   .ps-tbl th,.ps-tbl td{border-right:1px solid #e4e0d9;border-bottom:1px solid #e4e0d9;padding:6px 7px;text-align:center;white-space:nowrap}
   .ps-tbl th{background:var(--green);color:#fff;font-size:.68rem;font-weight:700;line-height:1.2;position:sticky;top:0;z-index:2}
+  /* 선수 스탯 표는 표 안에서 세로 스크롤 → 머리글(선수·참석일·경기·승-패…)이 위에 고정된다 */
+  .rs-tblwrap.ps-scroll{overflow:auto;max-height:72vh;max-height:72dvh}
   .ps-tbl .ps-name{position:sticky;left:0;z-index:3;background:#fff;text-align:left;min-width:82px;border-right:2px solid #c9c3ba;font-weight:700}
   .ps-tbl thead .ps-name{z-index:5;background:var(--green)}
   .ps-tbl tbody tr:nth-child(even) td{background:#faf9f7}
@@ -525,6 +527,7 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
     .ps-tbl .ps-name{min-width:58px}
     .ps-tbl td{position:relative}
     .ps-tbl .ps-up{position:absolute;top:1px;right:1px;margin:0;font-size:.42rem;vertical-align:0}
+    .rs-tblwrap.ps-scroll{max-height:calc(100dvh - 30px)}
   }
   @media(orientation:landscape) and (max-height:540px) and (max-width:720px){
     #modal{padding:4px}
@@ -540,6 +543,7 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   body.rs-rot .ps-tbl .ps-name{min-width:58px}
   body.rs-rot .ps-tbl td{position:relative}
   body.rs-rot .ps-tbl .ps-up{position:absolute;top:1px;right:1px;margin:0;font-size:.42rem;vertical-align:0}
+  body.rs-rot .rs-tblwrap.ps-scroll{max-height:calc(var(--rot-h,100dvw) - 30px)}
   body.rs-rot.rs-rot-sm .ps-tbl{font-size:.64rem}
   body.rs-rot.rs-rot-sm .ps-tbl th{font-size:.54rem}
   body.rs-rot.rs-rot-sm .ps-tbl th,body.rs-rot.rs-rot-sm .ps-tbl td{padding:3px 2px}
@@ -2864,7 +2868,7 @@ function psRenderSummary(){
     '<span class="ps-up ps-down" style="margin-left:0">▼</span> = 턴오버·반칙은 평균이 줄었을 때 (좋아진 기록)<br>'+
     '승률은 같은 날·같은 게임의 상대 팀 득점과 비교해 계산합니다. (상대 기록이 없는 게임은 제외)</p>'+
     (active.length
-      ? '<div class="rs-tblwrap"><table class="ps-tbl"><thead>'+
+      ? '<div class="rs-tblwrap ps-scroll"><table class="ps-tbl"><thead>'+
         psHead('<th>참석일</th><th>경기</th><th>승-패</th><th>W%<br><span style="font-weight:600;opacity:.8;font-size:.6rem">승률</span></th>')+'</thead>'+
         '<tbody>'+body+'</tbody></table></div>'+
         '<p class="ps-note" style="margin-top:9px">선수 이름을 누르면 게임별 기록을 볼 수 있습니다.</p>'
@@ -2921,7 +2925,7 @@ function psRenderPlayer(name,r){
       (hasVid?'<p class="ps-note" style="margin-bottom:8px">'+
         '<span class="ps-yt">▶ 날짜</span>를 누르면 그 경기 영상이 새 창에서 열립니다.</p>':'')+
       (gs.length
-        ? '<div class="rs-tblwrap"><table class="ps-tbl"><thead><tr>'+
+        ? '<div class="rs-tblwrap ps-scroll"><table class="ps-tbl"><thead><tr>'+
           '<th class="ps-name">날짜</th><th>진행일</th><th>게임</th><th>팀</th>'+
           RS_VIEW.map(c=>'<th>'+c.code+'<br><span style="font-weight:600;opacity:.8;font-size:.6rem">'+
             c.ko+'</span></th>').join('')+'</tr></thead>'+
