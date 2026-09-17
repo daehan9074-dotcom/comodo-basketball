@@ -470,6 +470,7 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .ps-note .ps-bad{background:#f8dad5;color:#933024;font-weight:800}
   .ps-wl{font-size:.72rem;color:#8a857d;font-weight:600}
   .ps-up{display:inline-block;margin-left:2px;font-size:.55em;color:#d9480f;vertical-align:.25em;line-height:1}
+  .ps-up.ps-down{color:#1c7ed6}
   /* PC: 선수 스탯 표가 가로로 잘리지 않도록 모달을 넓히고 표를 촘촘하게 */
   @media(min-width:900px) and (min-height:541px){
     .modal.wide:has(.ps-tbl){max-width:min(1480px,97vw);padding:22px 20px}
@@ -2773,18 +2774,21 @@ function psWinLabel(p){
   const w=p.wins||0,l=p.losses||0,d=p.draws||0;
   return d>0?(w+'-'+l+'-'+d):(w+'-'+l);
 }
-/* 지난주 대비 상승 화살표: 화면에 보이는 숫자(반올림 값) 기준으로 비교한다.
-   턴오버·반칙은 늘면 나쁜 기록이고, 시도 개수는 잘한 기록이 아니므로 제외. */
+/* 지난주 대비 화살표: 화면에 보이는 숫자(반올림 값) 기준으로 비교한다.
+   일반 항목은 오르면 ▲, 턴오버·반칙은 줄면 ▼ (둘 다 좋아진 기록). 시도 개수는 제외. */
 const PS_UP='<span class="ps-up" title="지난주보다 상승">▲</span>';
+const PS_DOWN='<span class="ps-up ps-down" title="지난주보다 감소">▼</span>';
 function psShown(p,c){
   const v=psColVal(p,c);
   if(c.t==='pct')return v<0?null:Math.round(v*100);
   return Math.round(v*10);
 }
-function psRose(p,c){
-  if(!p.prev||!p.prev.games||!psHighlightable(c)||(c.t==='s'&&PS_NEG[c.k]))return false;
+function psTrend(p,c){
+  if(!p.prev||!p.prev.games||!psHighlightable(c))return '';
   const now=psShown(p,c),before=psShown(p.prev,c);
-  return now!=null&&before!=null&&now>before;
+  if(now==null||before==null)return '';
+  if(c.t==='s'&&PS_NEG[c.k])return now<before?PS_DOWN:'';
+  return now>before?PS_UP:'';
 }
 function psSumCells(p,ths){
   return RS_VIEW.map((c,i)=>{
@@ -2795,7 +2799,7 @@ function psSumCells(p,ths){
     const txt=(c.t==='pct')
       ? rsPct(p.totals[RS_IDX[c.m]],p.totals[RS_IDX[c.a]])
       : v.toFixed(1);
-    return '<td'+(cls?' class="'+cls+'"':'')+'>'+txt+(psRose(p,c)?PS_UP:'')+'</td>';
+    return '<td'+(cls?' class="'+cls+'"':'')+'>'+txt+psTrend(p,c)+'</td>';
   }).join('');
 }
 
@@ -2856,7 +2860,8 @@ function psRenderSummary(){
     '<span class="ps-top" style="padding:1px 7px;border-radius:5px">초록색</span> = 해당 항목 상위 10% · '+
     '<span class="ps-bad" style="padding:1px 7px;border-radius:5px">빨간색</span> = 턴오버·반칙 상위 10% '+
     '(시도 개수는 제외)<br>'+
-    '<span class="ps-up" style="margin-left:0">▲</span> = 지난주(7일 전 기준) 평균보다 오른 기록 (턴오버·반칙·시도 개수는 제외)<br>'+
+    '<span class="ps-up" style="margin-left:0">▲</span> = 지난 일요일까지의 평균보다 이번 주(월~일) 기록이 반영된 평균이 오른 항목 (시도 개수는 제외)<br>'+
+    '<span class="ps-up ps-down" style="margin-left:0">▼</span> = 턴오버·반칙은 평균이 줄었을 때 (좋아진 기록)<br>'+
     '승률은 같은 날·같은 게임의 상대 팀 득점과 비교해 계산합니다. (상대 기록이 없는 게임은 제외)</p>'+
     (active.length
       ? '<div class="rs-tblwrap"><table class="ps-tbl"><thead>'+
