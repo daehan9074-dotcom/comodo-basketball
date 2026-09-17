@@ -469,6 +469,14 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .ps-note .ps-top{background:#cfe8cf;color:#1d5620;font-weight:800}
   .ps-note .ps-bad{background:#f8dad5;color:#933024;font-weight:800}
   .ps-wl{font-size:.72rem;color:#8a857d;font-weight:600}
+  .ps-up{display:inline-block;margin-left:2px;font-size:.55em;color:#d9480f;vertical-align:.25em;line-height:1}
+  /* PC: 선수 스탯 표가 가로로 잘리지 않도록 모달을 넓히고 표를 촘촘하게 */
+  @media(min-width:900px) and (min-height:541px){
+    .modal.wide:has(.ps-tbl){max-width:min(1480px,97vw);padding:22px 20px}
+    .ps-tbl{font-size:.78rem}
+    .ps-tbl th,.ps-tbl td{padding:5px 5px}
+    .ps-tbl .ps-name{min-width:70px}
+  }
   .ps-chiprow{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 14px}
   .ps-chip{background:var(--green-light);border:1px solid #b9d4b9;color:var(--green);border-radius:100px;padding:4px 11px;font-size:.8rem;font-weight:600}
   .ps-gtitle{display:inline-flex;align-items:center;gap:9px;padding:5px 13px;border-radius:8px;font-size:.85rem;font-weight:800;margin:16px 0 7px}
@@ -507,6 +515,35 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
     .ps-tbl th,.ps-tbl td{padding:4px 4px}
     .ps-tbl .ps-name{min-width:64px}
   }
+  /* 모바일 가로 보기: 한 화면에 표 전체가 들어오도록 더 촘촘하게.
+     상승 화살표는 칸 폭을 늘리지 않도록 숫자 오른쪽 위에 겹쳐 둔다. */
+  @media(orientation:landscape) and (max-height:540px){
+    #modal{padding:6px}
+    .modal{padding:10px 8px}
+    .ps-tbl th,.ps-tbl td{padding:4px 3px}
+    .ps-tbl .ps-name{min-width:58px}
+    .ps-tbl td{position:relative}
+    .ps-tbl .ps-up{position:absolute;top:1px;right:1px;margin:0;font-size:.42rem;vertical-align:0}
+  }
+  @media(orientation:landscape) and (max-height:540px) and (max-width:720px){
+    #modal{padding:4px}
+    .modal{padding:8px 4px}
+    .ps-tbl{font-size:.64rem}
+    .ps-tbl th{font-size:.54rem}
+    .ps-tbl th,.ps-tbl td{padding:3px 2px}
+    .ps-tbl .ps-name{min-width:52px}
+    .ps-tbl .ps-nb{font-size:.7rem}
+  }
+  body.rs-rot .modal{padding:10px 8px}
+  body.rs-rot .ps-tbl th,body.rs-rot .ps-tbl td{padding:4px 3px}
+  body.rs-rot .ps-tbl .ps-name{min-width:58px}
+  body.rs-rot .ps-tbl td{position:relative}
+  body.rs-rot .ps-tbl .ps-up{position:absolute;top:1px;right:1px;margin:0;font-size:.42rem;vertical-align:0}
+  body.rs-rot.rs-rot-sm .ps-tbl{font-size:.64rem}
+  body.rs-rot.rs-rot-sm .ps-tbl th{font-size:.54rem}
+  body.rs-rot.rs-rot-sm .ps-tbl th,body.rs-rot.rs-rot-sm .ps-tbl td{padding:3px 2px}
+  body.rs-rot.rs-rot-sm .ps-tbl .ps-name{min-width:52px}
+  body.rs-rot.rs-rot-sm .ps-tbl .ps-nb{font-size:.7rem}
 
   /* 작성되는 날짜 */
   .rs-dateline{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:var(--green-light);border:1.5px solid #c6ddc6;border-radius:11px;padding:11px 14px;margin-bottom:14px}
@@ -2544,6 +2581,7 @@ function rsRotSizeApply(){
   if(!w||!h)return;
   document.body.style.setProperty('--rot-w',h+'px');
   document.body.style.setProperty('--rot-h',w+'px');
+  document.body.classList.toggle('rs-rot-sm',h<=720);   // 작은 폰: 표를 더 촘촘하게
 }
 function rsCssRotate(){
   rsRotSizeApply();
@@ -2562,7 +2600,7 @@ function rsRotOff(){
   }
   document.body.style.removeProperty('--rot-w');
   document.body.style.removeProperty('--rot-h');
-  document.body.classList.remove('rs-rot');
+  document.body.classList.remove('rs-rot','rs-rot-sm');
   rsRotOn=false;rsRotNative=false;
   rsRotBtnLabel();
 }
@@ -2654,7 +2692,7 @@ function psNum(v,div){
 function psHead(extra){
   return '<tr><th class="ps-name">선수</th>'+extra+
     RS_VIEW.map(c=>'<th>'+c.code+'<br><span style="font-weight:600;opacity:.8;font-size:.6rem">'+
-      c.ko.replace(/<br>/g,'')+'</span></th>').join('')+'</tr>';
+      c.ko+'</span></th>').join('')+'</tr>';
 }
 /* totals: 13개 배열, pts: 득점 합계, div: 나눌 값(1이면 합계) */
 /* 한 행의 열별 원시값 (강조 비교용) */
@@ -2735,6 +2773,19 @@ function psWinLabel(p){
   const w=p.wins||0,l=p.losses||0,d=p.draws||0;
   return d>0?(w+'-'+l+'-'+d):(w+'-'+l);
 }
+/* 지난주 대비 상승 화살표: 화면에 보이는 숫자(반올림 값) 기준으로 비교한다.
+   턴오버·반칙은 늘면 나쁜 기록이고, 시도 개수는 잘한 기록이 아니므로 제외. */
+const PS_UP='<span class="ps-up" title="지난주보다 상승">▲</span>';
+function psShown(p,c){
+  const v=psColVal(p,c);
+  if(c.t==='pct')return v<0?null:Math.round(v*100);
+  return Math.round(v*10);
+}
+function psRose(p,c){
+  if(!p.prev||!p.prev.games||!psHighlightable(c)||(c.t==='s'&&PS_NEG[c.k]))return false;
+  const now=psShown(p,c),before=psShown(p.prev,c);
+  return now!=null&&before!=null&&now>before;
+}
 function psSumCells(p,ths){
   return RS_VIEW.map((c,i)=>{
     const v=psColVal(p,c);
@@ -2744,7 +2795,7 @@ function psSumCells(p,ths){
     const txt=(c.t==='pct')
       ? rsPct(p.totals[RS_IDX[c.m]],p.totals[RS_IDX[c.a]])
       : v.toFixed(1);
-    return '<td'+(cls?' class="'+cls+'"':'')+'>'+txt+'</td>';
+    return '<td'+(cls?' class="'+cls+'"':'')+'>'+txt+(psRose(p,c)?PS_UP:'')+'</td>';
   }).join('');
 }
 
@@ -2786,9 +2837,11 @@ function psRenderSummary(){
     }
     const wr=psWinRate(p);
     const wrCls=(winTh!=null&&wr>0&&wr>=winTh-1e-9)?' class="ps-top"':'';
+    const pwr=p.prev?psWinRate(p.prev):-1;
+    const wrUp=wr>=0&&pwr>=0&&Math.round(wr*100)>Math.round(pwr*100);
     return '<tr>'+nameCell+'<td>'+p.days+'</td><td>'+p.games+'</td>'+
       '<td class="ps-wl">'+psWinLabel(p)+'</td>'+
-      '<td'+wrCls+'>'+(wr<0?'-':Math.round(wr*100)+'%')+'</td>'+
+      '<td'+wrCls+'>'+(wr<0?'-':Math.round(wr*100)+'%')+(wrUp?PS_UP:'')+'</td>'+
       psSumCells(p,ths)+'</tr>';
   }).join('');
 
@@ -2803,6 +2856,7 @@ function psRenderSummary(){
     '<span class="ps-top" style="padding:1px 7px;border-radius:5px">초록색</span> = 해당 항목 상위 10% · '+
     '<span class="ps-bad" style="padding:1px 7px;border-radius:5px">빨간색</span> = 턴오버·반칙 상위 10% '+
     '(시도 개수는 제외)<br>'+
+    '<span class="ps-up" style="margin-left:0">▲</span> = 지난주(7일 전 기준) 평균보다 오른 기록 (턴오버·반칙·시도 개수는 제외)<br>'+
     '승률은 같은 날·같은 게임의 상대 팀 득점과 비교해 계산합니다. (상대 기록이 없는 게임은 제외)</p>'+
     (active.length
       ? '<div class="rs-tblwrap"><table class="ps-tbl"><thead>'+
@@ -2865,7 +2919,7 @@ function psRenderPlayer(name,r){
         ? '<div class="rs-tblwrap"><table class="ps-tbl"><thead><tr>'+
           '<th class="ps-name">날짜</th><th>진행일</th><th>게임</th><th>팀</th>'+
           RS_VIEW.map(c=>'<th>'+c.code+'<br><span style="font-weight:600;opacity:.8;font-size:.6rem">'+
-            c.ko.replace(/<br>/g,'')+'</span></th>').join('')+'</tr></thead>'+
+            c.ko+'</span></th>').join('')+'</tr></thead>'+
           '<tbody>'+rows+'</tbody>'+foot+'</table></div>'
         : '<div class="rs-warn">최근 경기 데이터가 없습니다.</div>')+
       '<div style="text-align:center;margin-top:14px">'+
@@ -2940,9 +2994,13 @@ function psRenderDate(r){
     ? '<div class="ps-chiprow">'+names.map(n=>'<span class="ps-chip">'+esc(n)+'</span>').join('')+'</div>'
     : '<div class="rs-warn">이 날짜의 기록이 없습니다.</div>';
 
-  const sumRows=(r.players||[]).map(p=>
+  // 선수별 이 날 합계: 표에 보이는 합계값 기준 상위 10% 강조
+  const dayPlayers=r.players||[];
+  const dayThs=RS_VIEW.map(c=>psHighlightable(c)
+    ?psTopN(dayPlayers.map(p=>psRowVal(p.totals,p.pts,c))):null);
+  const sumRows=dayPlayers.map(p=>
     '<tr><td class="ps-name"><button class="ps-nb" onclick="psPlayer(\''+jsq(p.name)+'\')">'+esc(p.name)+'</button></td>'+
-    '<td>'+p.games+'</td>'+psCells(p.totals,p.pts,1)+'</tr>').join('');
+    '<td>'+p.games+'</td>'+psCells(p.totals,p.pts,1,dayThs)+'</tr>').join('');
 
   // 게임·팀별 기록지 (g = [게임, 팀, 유니폼색, 이름, ...스탯13, 득점])
   const groups={},order=[];
@@ -2982,7 +3040,10 @@ function psRenderDate(r){
     '<button class="rs-tool" onclick="psOpenCalendar()">📅 다른 날짜</button>'+
     '<button class="rs-tool" onclick="psRenderSummary()">← 목록으로</button></div></div>'+
     '<div class="ps-note"><b>참석자 '+names.length+'명</b> (게스트 포함)</div>'+chips+
-    '<p class="ps-note">아래 게임별 표에서 '+
+    '<p class="ps-note"><b>선수별 이 날 합계</b> 표에서 '+
+    '<span class="ps-top" style="padding:1px 7px;border-radius:5px">초록색</span>은 해당 항목 상위 10%, '+
+    '<span class="ps-bad" style="padding:1px 7px;border-radius:5px">빨간색</span>은 턴오버·반칙 상위 10%입니다.<br>'+
+    '아래 게임별 표에서 '+
     '<span class="ps-top" style="padding:1px 7px;border-radius:5px">초록색</span>은 팀내 최고 수치, '+
     '<span class="ps-bad" style="padding:1px 7px;border-radius:5px">빨간색</span>은 팀내 최다 턴오버·반칙입니다. '+
     '(시도 개수는 제외)</p>'+
