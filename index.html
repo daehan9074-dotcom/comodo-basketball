@@ -3004,7 +3004,9 @@ function psRenderDate(r){
     : '<div class="rs-warn">이 날짜의 기록이 없습니다.</div>';
 
   // 선수별 이 날 평균: 게임 1개당 평균값 기준 상위 10% 강조
-  const dayPlayers=r.players||[];
+  // 평균 득점이 높은 순 (같으면 이름순)
+  const dayPlayers=(r.players||[]).slice().sort((a,b)=>
+    (b.pts/(b.games||1))-(a.pts/(a.games||1))||(a.name<b.name?-1:a.name>b.name?1:0));
   const dayThs=psThresholds(dayPlayers);
   const sumRows=dayPlayers.map(p=>
     '<tr><td class="ps-name"><button class="ps-nb" onclick="psPlayer(\''+jsq(p.name)+'\')">'+esc(p.name)+'</button></td>'+
