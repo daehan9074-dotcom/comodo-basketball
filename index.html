@@ -473,6 +473,13 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .ps-wl{font-size:.72rem;color:#8a857d;font-weight:600}
   .ps-up{display:inline-block;margin-left:2px;font-size:.55em;color:#d9480f;vertical-align:.25em;line-height:1}
   .ps-up.ps-down{color:#1c7ed6}
+  .ps-win{color:#1c7ed6;font-weight:800}
+  .ps-lose{color:#d9480f;font-weight:800}
+  /* 누적 선수 기록: 머리글을 누르면 그 항목 순으로 정렬 */
+  .ps-tbl th.ps-sort{cursor:pointer;user-select:none;-webkit-user-select:none}
+  .ps-tbl th.ps-sort:hover{filter:brightness(1.12)}
+  .ps-tbl th.ps-sort.on{background:#1e5e3a;box-shadow:inset 0 -3px 0 #ffd43b}
+  .ps-tbl th .ps-arw{font-size:.8em;color:#ffd43b;margin-left:1px}
   /* PC: 선수 기록 표가 가로로 잘리지 않도록 모달을 넓히고 표를 촘촘하게 */
   @media(min-width:900px) and (min-height:541px){
     .modal.wide:has(.ps-tbl){max-width:min(1480px,97vw);padding:22px 20px}
@@ -2807,6 +2814,33 @@ function psSumCells(p,ths){
   }).join('');
 }
 
+/* 누적 선수 기록 정렬: null=기본(평균 득점순), 'name', 'days', 'games', 'wl', 'wr', 'c0'~(RS_VIEW 열 번호) */
+let psSortKey=null;
+function psSortVal(k){
+  if(!k||k==='name')return null;
+  if(k==='days')return p=>p.days||0;
+  if(k==='games')return p=>p.games||0;
+  if(k==='wl')return p=>(p.wins||0)-(p.losses||0)*1e-3;   // 승 많은 순, 같으면 패 적은 순
+  if(k==='wr')return p=>psWinRate(p);
+  const c=RS_VIEW[+k.slice(1)];
+  return c?(p=>psColVal(p,c)):null;
+}
+function psSortBy(k){
+  psSortKey=(psSortKey===k)?null:k;   // 같은 머리글을 다시 누르면 원래 순서로
+  psRenderSummary();
+}
+function psSortHead(){
+  const sub=t=>'<br><span style="font-weight:600;opacity:.8;font-size:.6rem">'+t+'</span>';
+  const th=(k,html,cls)=>{
+    const on=psSortKey===k;
+    return '<th class="'+(cls?cls+' ':'')+'ps-sort'+(on?' on':'')+'" onclick="psSortBy(\''+k+'\')">'+
+      html+(on?'<span class="ps-arw">▼</span>':'')+'</th>';
+  };
+  return '<tr>'+th('name','선수','ps-name')+th('days','참석일')+th('games','경기')+th('wl','승-패')+
+    th('wr','W%'+sub('승률'))+
+    RS_VIEW.map((c,i)=>th('c'+i,c.code+sub(c.ko))).join('')+'</tr>';
+}
+
 function psRenderSummary(){
   const r=psSummary;
   if(!r){psOpenSummary();return}   // 개인 스탯부터 연 경우엔 목록을 새로 불러온다
@@ -2827,9 +2861,13 @@ function psRenderSummary(){
     {name:n,active:false,games:0,days:0,pts:0,totals:new Array(RS_KEYS.length).fill(0)});
 
   // 경기 평균 득점순 (기록 없는 선수는 뒤로, 그 안에서는 이름순)
+  // 머리글을 눌러 정렬 항목을 고르면 그 값이 높은 순 (선수 이름은 가나다순)
+  const sv=psSortVal(psSortKey);
   rows.sort((a,b)=>{
     if(!!a.active!==!!b.active)return a.active?-1:1;
     if(!a.active)return a.name<b.name?-1:1;
+    if(psSortKey==='name')return a.name.localeCompare(b.name,'ko');
+    if(sv){const d=sv(b)-sv(a);if(d)return d}
     return (b.pts/(b.games||1))-(a.pts/(a.games||1));
   });
 
@@ -2857,7 +2895,7 @@ function psRenderSummary(){
     '<div class="rs-hd"><h3>📈 선수 기록</h3><div style="display:flex;gap:6px">'+rotateBtnHtml()+
     '<button class="rs-tool" onclick="psOpenCalendar()">📅 날짜별 보기</button></div></div>'+
     '<p class="ps-note">선수마다 <b>실제 참석한 최근 '+PS_DAYS+'일</b>의 기록을 모아 <b>경기 1게임당 평균</b>으로 계산합니다. '+
-    '평균 득점이 높은 순으로 정렬됩니다.<br>'+
+    '평균 득점이 높은 순으로 정렬되며, <b>표 머리글(항목)을 누르면 그 항목이 높은 순</b>으로 바뀝니다. (한 번 더 누르면 원래 순서)<br>'+
     '최근 '+PS_ACTIVE_MONTHS+'개월 안에 기록이 없는 선수는 비워 둡니다. '+
     '<b>게스트·휴활회원은 이 목록에서 빠지며</b>, 📅 날짜별 보기에서는 그대로 표시됩니다.'+
     (r.activeFrom?' (기준일 '+esc(r.activeFrom)+' 이후)':'')+'<br>'+
@@ -2869,7 +2907,7 @@ function psRenderSummary(){
     '승률은 같은 날·같은 게임의 상대 팀 득점과 비교해 계산합니다. (상대 기록이 없는 게임은 제외)</p>'+
     (active.length
       ? '<div class="rs-tblwrap ps-scroll"><table class="ps-tbl"><thead>'+
-        psHead('<th>참석일</th><th>경기</th><th>승-패</th><th>W%<br><span style="font-weight:600;opacity:.8;font-size:.6rem">승률</span></th>')+'</thead>'+
+        psSortHead()+'</thead>'+
         '<tbody>'+body+'</tbody></table></div>'+
         '<p class="ps-note" style="margin-top:9px">선수 이름을 누르면 게임별 기록을 볼 수 있습니다.</p>'
       : '<div class="rs-warn">최근 경기 데이터가 없습니다.</div>')+
@@ -2897,8 +2935,9 @@ async function psPlayer(name){
 /* 받아 둔 데이터로 개인 기록 화면을 그린다 (회전 시 다시 그릴 때도 이 함수를 쓴다) */
 function psRenderPlayer(name,r){
     _modalRender=()=>psRenderPlayer(name,r);
-    // g = [날짜, 진행일, 게임, 팀, 유니폼색, ...스탯13, 득점]
+    // g = [날짜, 진행일, 게임, 팀, 유니폼색, ...스탯13, 득점, 승패(W/L/D)]
     const gs=r.games||[];
+    const WL={W:'<span class="ps-win">승</span>',L:'<span class="ps-lose">패</span>',D:'무'};
     const vm=vidMap(r.videos);
     let hasVid=false;
     const rows=gs.map(g=>{
@@ -2908,15 +2947,16 @@ function psRenderPlayer(name,r){
       const vu=vidFind(vm,g[0],g[2]);   // 그 날짜·게임의 영상 (없으면 그 날 전체 영상)
       if(vu)hasVid=true;
       return '<tr><td class="ps-name">'+(vu?vidLink(vu,g[0]):esc(g[0]))+'</td>'+
-        '<td>'+esc(g[1]||'-')+'</td><td>'+esc(String(g[2]))+'</td>'+
+        '<td>'+(WL[g[6+RS_KEYS.length]]||'-')+'</td><td>'+esc(String(g[2]))+'</td>'+
         '<td><span class="rs-chip" style="background:'+esc(c)+';color:'+rsFg(c)+'">'+esc(g[3]||'-')+'</span></td>'+
         psCells(totals,pts,1)+'</tr>';
     }).join('');
     const s=r.summary;
     const foot=s
-      ? '<tfoot><tr><td class="ps-name">합계</td><td colspan="2">'+s.days+'일 / '+s.games+'게임</td><td>-</td>'+
+      ? '<tfoot><tr><td class="ps-name">합계</td><td colspan="2">'+s.days+'일 / '+s.games+'게임</td><td>'+psWinLabel(s)+'</td>'+
         psCells(s.totals,s.pts,1)+'</tr>'+
-        '<tr><td class="ps-name">경기 평균</td><td colspan="2">전체 기간</td><td>-</td>'+
+        '<tr><td class="ps-name">경기 평균</td><td colspan="2">전체 기간</td><td>'+
+        (psWinRate(s)<0?'-':'승률 '+Math.round(psWinRate(s)*100)+'%')+'</td>'+
         psCells(s.totals,s.pts,s.games||1)+'</tr></tfoot>'
       : '';
     openModal(
@@ -2926,7 +2966,7 @@ function psRenderPlayer(name,r){
         '<span class="ps-yt">▶ 날짜</span>를 누르면 그 경기 영상이 새 창에서 열립니다.</p>':'')+
       (gs.length
         ? '<div class="rs-tblwrap ps-scroll"><table class="ps-tbl"><thead><tr>'+
-          '<th class="ps-name">날짜</th><th>진행일</th><th>게임</th><th>팀</th>'+
+          '<th class="ps-name">날짜</th><th>승패</th><th>게임</th><th>팀</th>'+
           RS_VIEW.map(c=>'<th>'+c.code+'<br><span style="font-weight:600;opacity:.8;font-size:.6rem">'+
             c.ko+'</span></th>').join('')+'</tr></thead>'+
           '<tbody>'+rows+'</tbody>'+foot+'</table></div>'
