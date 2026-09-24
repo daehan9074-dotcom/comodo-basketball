@@ -2947,11 +2947,12 @@ function psRenderPlayer(name,r){
       const vu=vidFind(vm,g[0],g[2]);   // 그 날짜·게임의 영상 (없으면 그 날 전체 영상)
       if(vu)hasVid=true;
       return '<tr><td class="ps-name">'+(vu?vidLink(vu,g[0]):esc(g[0]))+'</td>'+
-        '<td>'+(WL[g[6+RS_KEYS.length]]||'-')+'</td><td>'+esc(String(g[2]))+'</td>'+
         '<td><span class="rs-chip" style="background:'+esc(c)+';color:'+rsFg(c)+'">'+esc(g[3]||'-')+'</span></td>'+
+        '<td>'+esc(String(g[2]))+'</td><td>'+(WL[g[6+RS_KEYS.length]]||'-')+'</td>'+
         psCells(totals,pts,1)+'</tr>';
     }).join('');
     const s=r.summary;
+    // 합계·경기 평균: 팀+게임 칸을 합쳐 일수/게임수를 쓰고, 승-패·승률은 승패 열에 맞춘다
     const foot=s
       ? '<tfoot><tr><td class="ps-name">합계</td><td colspan="2">'+s.days+'일 / '+s.games+'게임</td><td>'+psWinLabel(s)+'</td>'+
         psCells(s.totals,s.pts,1)+'</tr>'+
@@ -2966,7 +2967,7 @@ function psRenderPlayer(name,r){
         '<span class="ps-yt">▶ 날짜</span>를 누르면 그 경기 영상이 새 창에서 열립니다.</p>':'')+
       (gs.length
         ? '<div class="rs-tblwrap ps-scroll"><table class="ps-tbl"><thead><tr>'+
-          '<th class="ps-name">날짜</th><th>승패</th><th>게임</th><th>팀</th>'+
+          '<th class="ps-name">날짜</th><th>팀</th><th>게임</th><th>승패</th>'+
           RS_VIEW.map(c=>'<th>'+c.code+'<br><span style="font-weight:600;opacity:.8;font-size:.6rem">'+
             c.ko+'</span></th>').join('')+'</tr></thead>'+
           '<tbody>'+rows+'</tbody>'+foot+'</table></div>'
