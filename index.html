@@ -396,6 +396,18 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .rs-who button{border:none;background:#fff;color:var(--green);border-radius:100px;padding:2px 8px;font-family:inherit;font-size:.72rem;font-weight:700;cursor:pointer}
   .rs-resume{background:var(--field-bg);border:1.5px solid var(--border);border-radius:11px;padding:10px 13px;margin:10px 0 4px;font-size:.86rem;line-height:1.75;text-align:left}
   .rs-resume b{color:var(--green)}
+  /* 이름 고르기 칸 (▼ 목록 + 이름 일부 검색) */
+  .nm-in{position:relative}
+  .nm-in input{padding-right:46px}
+  .nm-arrow{position:absolute;top:0;right:0;bottom:0;width:44px;border:none;background:none;color:var(--green);font-size:.85rem;cursor:pointer;font-family:inherit}
+  .nm-list{margin-top:5px;max-height:216px;overflow-y:auto;border:1.5px solid var(--border);border-radius:10px;background:#fff;-webkit-overflow-scrolling:touch}
+  .nm-list button{display:flex;align-items:center;gap:7px;width:100%;text-align:left;padding:10px 12px;border:none;border-bottom:1px solid #f0ece5;background:none;font-family:inherit;font-size:.92rem;color:#333;cursor:pointer}
+  .nm-list button:last-child{border-bottom:none}
+  .nm-list button:active,.nm-list button:hover{background:var(--green-light)}
+  .nm-list button b{color:var(--green)}
+  .nm-list .tag{margin-left:auto;font-size:.7rem;font-weight:700;color:var(--green);background:var(--green-light);border-radius:100px;padding:1px 8px}
+  .nm-list .pos{font-size:.72rem;font-weight:700;color:#999;min-width:12px}
+  .nm-list .none{padding:10px 12px;font-size:.82rem;color:#999}
   /* 그 날 게임 진행 현황 */
   .rs-prog{border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:14px;background:#fff}
   .rs-prog .pg-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.86rem;font-weight:700;color:#444;margin-bottom:6px}
@@ -1854,12 +1866,10 @@ function rsRenderStart(){
   let last=rsRecorder;
   if(!last){try{last=localStorage.getItem(RS_REC_KEY)||''}catch(e){}}
   if(!last&&currentMember&&currentMember.name)last=currentMember.name;
-  const listed=currentMembers.filter(m=>!rsIsGuest(m)).map(m=>'<option value="'+esc(m.name)+'"></option>').join('');
   openModal(
     '<div class="rs-hd"><h3>📝 기록 입력</h3></div>'+
     '<div class="field"><label class="main-label">기록자 (입력하는 회원)</label>'+
-    '<input type="text" id="rsRecName" list="rsRecList" autocomplete="off" placeholder="본인 이름 입력 또는 선택" value="'+esc(last)+'" />'+
-    '<datalist id="rsRecList">'+listed+'</datalist></div>'+
+    nmBoxHtml('rsRecName',()=>rsPickList({noGuest:true}),'이름 입력(성 빼도 됨) 또는 ▼ 선택',last)+'</div>'+
     '<div class="field"><label class="main-label">입력 방식</label><div class="rs-modepick" id="rsModePick">'+rsModeBtnsHtml()+'</div></div>'+
     '<div class="modal-actions">'+
     '<button class="btn-secondary" onclick="closeModal()">닫기</button>'+
@@ -1886,8 +1896,9 @@ function rsPickStartMode(m){
 }
 function rsStartNext(){
   const el=document.getElementById('rsRecName');
-  const name=String((el&&el.value)||'').trim();
-  if(!name){toast('기록자 이름을 입력하세요','error');if(el)el.focus();return}
+  if(!String((el&&el.value)||'').trim()){toast('기록자 이름을 입력하세요','error');if(el)el.focus();return}
+  const name=nmResolve('rsRecName');
+  if(!name)return;
   // 명단을 불러온 경우에만 회원인지 확인한다 (명단이 비어 있으면 막지 않음)
   if(currentMembers.length&&!currentMembers.some(m=>m.name===name&&!rsIsGuest(m))){
     toast('회원 명단에 있는 이름을 입력하세요','error');return;
@@ -2745,6 +2756,107 @@ function rsSetupDel(ti,mi){
 function rsIsGuest(m){return !!(m&&(m.isGuest||m.memberType==='게스트'))}
 function rsGuestTag(m){return rsIsGuest(m)?'<span class="rs-g" title="게스트">게</span>':''}
 
+/* ===== 이름 고르기 칸 =====
+   모바일 datalist 는 회원 목록이 화면 가득 떠서 쓰기 불편하다.
+   대신 ▼ 를 누르면 칸 바로 아래에 목록을 펼치고, 글자를 치면 이름 어디에든 들어간 사람만 보여준다
+   (성을 빼고 '길동' 만 쳐도 '홍길동' 이 나온다). */
+const _nmSrc={};   // 칸 id → 목록을 돌려주는 함수 [{name, pos, tag}]
+function nmBoxHtml(id,src,placeholder,value){
+  _nmSrc[id]=src;
+  return '<div class="nm-box" id="'+id+'Box">'+
+    '<div class="nm-in"><input type="text" id="'+id+'" autocomplete="off" placeholder="'+esc(placeholder)+'" '+
+    'value="'+esc(value||'')+'" oninput="nmShow(\''+id+'\',false)" />'+
+    '<button type="button" class="nm-arrow" onclick="nmToggle(\''+id+'\')" aria-label="목록 열기">▼</button></div>'+
+    '<div class="nm-list" id="'+id+'List" hidden></div></div>';
+}
+function nmHide(id){
+  const l=document.getElementById(id+'List');
+  if(l)l.hidden=true;
+  const a=document.querySelector('#'+id+'Box .nm-arrow');
+  if(a)a.textContent='▼';
+}
+/* all=true: 입력값과 관계없이 전체 목록 (▼ 버튼) */
+function nmShow(id,all){
+  const inp=document.getElementById(id),l=document.getElementById(id+'List');
+  if(!inp||!l)return;
+  const q=String(inp.value||'').replace(/\s+/g,'');
+  if(!all&&!q){nmHide(id);return}
+  const items=(_nmSrc[id]?_nmSrc[id]():[]);
+  const hits=(all||!q)?items:items.filter(x=>x.name.replace(/\s+/g,'').indexOf(q)>=0);
+  const mark=n=>{
+    const i=q?n.indexOf(q):-1;
+    return i<0?esc(n):esc(n.slice(0,i))+'<b>'+esc(q)+'</b>'+esc(n.slice(i+q.length));
+  };
+  l.innerHTML=hits.length
+    ? hits.map(x=>'<button type="button" onclick="nmPick(\''+id+'\',\''+jsq(x.name)+'\')">'+
+        (x.pos?'<span class="pos">'+esc(x.pos)+'</span>':'')+mark(x.name)+
+        (x.tag?'<span class="tag">'+esc(x.tag)+'</span>':'')+'</button>').join('')
+    : '<div class="none">'+(q?'\''+esc(q)+'\' 이(가) 들어간 이름이 없습니다':'목록이 비어 있습니다')+'</div>';
+  l.hidden=false;
+  const a=document.querySelector('#'+id+'Box .nm-arrow');
+  if(a)a.textContent='▲';
+}
+/* ▼ 는 키보드를 띄우지 않고 목록만 펼친다 */
+function nmToggle(id){
+  const l=document.getElementById(id+'List');
+  if(l&&!l.hidden){nmHide(id);return}
+  nmShow(id,true);
+}
+function nmPick(id,name){
+  const inp=document.getElementById(id);
+  if(inp)inp.value=name;
+  nmHide(id);
+}
+/* 이름 일부만 치고 확인을 누른 경우를 정리한다.
+   목록에 딱 맞는 이름이 있거나 한 사람만 걸리면 그 이름, 여러 명이 걸리면 '' (목록을 펼쳐 고르게 함),
+   하나도 안 걸리면 친 그대로 돌려준다. */
+function nmResolve(id){
+  const inp=document.getElementById(id);
+  const raw=String((inp&&inp.value)||'').trim();
+  if(!raw)return '';
+  const items=_nmSrc[id]?_nmSrc[id]():[];
+  if(items.some(x=>x.name===raw))return raw;
+  const q=raw.replace(/\s+/g,'');
+  const hits=items.filter(x=>x.name.replace(/\s+/g,'').indexOf(q)>=0);
+  if(hits.length===1){inp.value=hits[0].name;nmHide(id);return hits[0].name}
+  if(hits.length>1){nmShow(id,false);toast(hits.length+'명이 있습니다. 목록에서 골라 주세요','error');return ''}
+  return raw;
+}
+// 목록 밖을 누르면 접는다
+document.addEventListener('click',(e)=>{
+  document.querySelectorAll('.nm-box').forEach(b=>{
+    if(!b.contains(e.target))nmHide(b.id.slice(0,-3));
+  });
+});
+
+/* 이름 목록에 넣을 사람: 정회원 + 이번 주 참석자로 등록된 사람 (휴활회원·게스트는 참석 등록했을 때만)
+   참석자는 '참석' 표시와 함께 위쪽에 둔다. */
+function rsPickList(opt){
+  const att={};
+  currentAttendance.forEach(a=>{
+    const days=a.days||[];
+    if(!days.length)return;
+    att[a.name]=(rsDay&&days.indexOf(rsDay)>=0)?2:1;   // 2 = 이 진행일 참석
+  });
+  const POS={가드:'G',포워드:'F',센터:'C'};
+  const tagOf=w=>w===2?'참석':(w===1?'이번 주 참석':'');
+  const out=[],seen={};
+  currentMembers.forEach(m=>{
+    const t=m.memberType||'정회원';
+    if(!att[m.name]&&t!=='정회원')return;
+    if(opt&&opt.noGuest&&t==='게스트')return;
+    seen[m.name]=1;
+    out.push({name:m.name,pos:POS[m.position]||'',tag:tagOf(att[m.name]),w:att[m.name]||0});
+  });
+  // 명단에 없는 참석자 (기록자 목록에는 넣지 않음)
+  if(!(opt&&opt.noGuest))Object.keys(att).forEach(n=>{
+    if(!seen[n])out.push({name:n,pos:'',tag:tagOf(att[n]),w:att[n]});
+  });
+  const skip=(opt&&opt.skip)||{};
+  return out.filter(x=>!skip[x.name])
+    .sort((a,b)=>(b.w-a.w)||a.name.localeCompare(b.name,'ko'));
+}
+
 let rsAddType='member',rsAddTeamSel=0,rsAddKeep='';
 function rsAddPlayerDialog(preTeam){
   rsAddType='member';
@@ -2765,7 +2877,6 @@ function rsAddSetType(g){
 function rsAddRender(){
   const guest=(rsAddType==='guest');
   const opts=rsTeams.map((t,i)=>'<option value="'+i+'"'+(i===rsAddTeamSel?' selected':'')+'>'+esc(t.label)+'팀</option>').join('');
-  const listed=currentMembers.map(m=>'<option value="'+esc(m.name)+'"></option>').join('');
   const val=' value="'+esc(rsAddKeep)+'"';
   popupHtml(
     '<h3>선수 · 게스트 추가</h3>'+
@@ -2777,8 +2888,12 @@ function rsAddRender(){
     '<div class="field"><label class="main-label">이름</label>'+
     (guest
       ? '<input type="text" id="rsNewName" autocomplete="off" placeholder="게스트 이름"'+val+' />'
-      : '<input type="text" id="rsNewName" list="rsMemList" autocomplete="off" placeholder="이름 입력 또는 선택"'+val+' />'+
-        '<datalist id="rsMemList">'+listed+'</datalist>')+
+      : nmBoxHtml('rsNewName',()=>{
+          // 이미 팀에 들어 있는 사람은 목록에서 뺀다
+          const skip={};
+          rsTeams.forEach(t=>t.members.forEach(m=>{skip[m.name]=1}));
+          return rsPickList({skip});
+        },'이름 입력(성 빼도 됨) 또는 ▼ 선택',rsAddKeep))+
     '</div>'+
     (guest
       ? '<div class="field"><label class="main-label">포지션</label>'+
@@ -2800,8 +2915,11 @@ function rsAddRender(){
 }
 function rsAddPlayer(){
   const nameEl=document.getElementById('rsNewName');
-  const name=String((nameEl&&nameEl.value)||'').trim();
-  if(!name){toast('이름을 입력하세요','error');return}
+  const typed=String((nameEl&&nameEl.value)||'').trim();
+  if(!typed){toast('이름을 입력하세요','error');return}
+  // 회원: '길동' 처럼 일부만 쳐도 한 사람만 걸리면 그 사람으로 (여러 명이면 목록에서 고르게)
+  const name=(rsAddType==='guest')?typed:nmResolve('rsNewName');
+  if(!name)return;
   const ti=parseInt((document.getElementById('rsNewTeam')||{}).value,10)||0;
   for(let i=0;i<rsTeams.length;i++){
     if(rsTeams[i].members.some(m=>m.name===name)){
