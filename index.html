@@ -385,6 +385,31 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .rs-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .rs-inline input[type="date"],.rs-inline input[type="number"],.rs-inline select{width:auto;min-width:130px}
   .rs-warn{background:#fff4e6;border:1.5px solid #ffb74d;border-radius:10px;padding:11px 13px;font-size:.84rem;color:#a56a00;line-height:1.6;margin-bottom:10px}
+  /* 입력 방식 선택 / 기록자 */
+  .rs-modepick{display:flex;flex-direction:column;gap:8px}
+  .rs-modebtn{display:block;width:100%;text-align:left;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;background:var(--field-bg);font-family:inherit;cursor:pointer;transition:.15s}
+  .rs-modebtn b{display:block;font-size:.95rem;color:#333;margin-bottom:3px}
+  .rs-modebtn span{font-size:.8rem;color:#777;line-height:1.5}
+  .rs-modebtn.on{border-color:var(--green);background:var(--green-light);box-shadow:0 0 0 2px rgba(44,95,46,.12)}
+  .rs-modebtn.on b{color:var(--green)}
+  .rs-who{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:.78rem;font-weight:700;color:var(--green);background:var(--green-light);border:1px solid #c6ddc6;border-radius:100px;padding:3px 4px 3px 10px}
+  .rs-who button{border:none;background:#fff;color:var(--green);border-radius:100px;padding:2px 8px;font-family:inherit;font-size:.72rem;font-weight:700;cursor:pointer}
+  .rs-resume{background:var(--field-bg);border:1.5px solid var(--border);border-radius:11px;padding:10px 13px;margin:10px 0 4px;font-size:.86rem;line-height:1.75;text-align:left}
+  .rs-resume b{color:var(--green)}
+  /* 그 날 게임 진행 현황 */
+  .rs-prog{border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:14px;background:#fff}
+  .rs-prog .pg-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.86rem;font-weight:700;color:#444;margin-bottom:6px}
+  .rs-prog .pg-hd b{color:var(--green);font-size:.95rem}
+  .rs-prog .pg-next{margin-left:auto;font-size:.78rem;font-weight:700;color:#fff;background:var(--green);border-radius:100px;padding:3px 10px}
+  .rs-prog .pg-empty{font-size:.82rem;color:#999}
+  .rs-pg{display:flex;align-items:center;gap:7px;flex-wrap:wrap;width:100%;text-align:left;padding:7px 9px;margin-top:5px;border:1px solid #e6e1d8;border-radius:9px;background:var(--field-bg);font-family:inherit;font-size:.8rem;color:#555;cursor:pointer}
+  .rs-pg.cur{border-color:var(--green);box-shadow:0 0 0 2px rgba(44,95,46,.12);background:var(--green-light)}
+  .rs-pg .g{font-weight:800;color:#333;min-width:42px}
+  .rs-pg .sc{font-weight:800;color:#333}
+  .rs-pg .tc{display:inline-block;padding:1px 7px;border-radius:100px;font-size:.72rem;font-weight:700;border:1px solid rgba(0,0,0,.15)}
+  .rs-pg .wait{color:#c77700;font-weight:700}
+  .rs-pg .who{margin-left:auto;color:#888;font-size:.74rem}
+  .rs-pg .now{color:var(--green);font-weight:800;font-size:.74rem}
 
   /* ===== 화면 회전(가로 보기) ===== */
   body.rs-rot{overflow:hidden}
@@ -701,9 +726,11 @@ function closeModal(){
   _statusOpen=false;
   _modalRender=null;
   if(typeof rsRotOff==='function')rsRotOff();   // 가로 보기 상태로 남지 않도록
+  if(typeof rsGuardOff==='function')rsGuardOff();
   document.getElementById('modal').classList.remove('show');
 }
-document.getElementById('modal').addEventListener('click',(e)=>{if(e.target.id==='modal')closeModal()});
+// 기록 입력 중에는 바깥을 잘못 눌러도 닫히지 않는다
+document.getElementById('modal').addEventListener('click',(e)=>{if(e.target.id==='modal'&&!_rsGuard)closeModal()});
 document.getElementById('alertLayer').addEventListener('click',(e)=>{if(e.target.id==='alertLayer')closePopup()});
 
 /* ===== 초기 로드 (stale-while-revalidate) =====
@@ -1655,6 +1682,9 @@ let rsStats={},rsHist=[],rsBusy=false;
 let rsPast=false,rsLoadedFrom='',rsView='setup',rsWideMode=null;
 let rsMarks={},rsCalY=0,rsCalM=0;   // 지난 경기 캘린더
 let rsRotOn=false,rsRotNative=false;
+// 입력 방식: 'solo' = 한 사람이 두 팀 모두 / 'team' = 한 사람이 한 팀씩 따로 저장
+let rsInMode='solo',rsRecorder='';
+const RS_REC_KEY='komodo_rs_recorder';   // 마지막 기록자 이름 (다음에 미리 채움)
 
 function rsBlank(){const o={};RS_KEYS.forEach(k=>o[k]=0);return o}
 function rsGet(name){if(!rsStats[name])rsStats[name]=rsBlank();return rsStats[name]}
@@ -1674,7 +1704,8 @@ function rsTeamAt(i){return rsTeams[i]||null}
 function rsSaveDraft(){
   try{
     localStorage.setItem(RS_DRAFT_KEY,JSON.stringify({
-      date:rsDate,day:rsDay,teams:rsTeams,game:rsGame,match:rsMatch,stats:rsStats,t:Date.now()
+      date:rsDate,day:rsDay,teams:rsTeams,game:rsGame,match:rsMatch,stats:rsStats,
+      mode:rsInMode,recorder:rsRecorder,view:rsView,t:Date.now()
     }));
   }catch(e){}
 }
@@ -1691,37 +1722,193 @@ function rsDraftHasInput(d){
   return Object.keys(s).some(n=>RS_KEYS.some(k=>(s[n][k]||0)>0));
 }
 
+/* 저장하지 않은 기록이 기기에 남아 있는지 (저장하면 임시저장이 지워진다) */
+function rsUnsaved(){const d=rsReadDraft();return !!(d&&rsDraftHasInput(d))}
+
+/* ===== 당일 제한 =====
+   회원은 경기 당일 기록만 입력·수정할 수 있다. 지난 날짜는 관리자 로그인 후에만.
+   (서버 handleSaveGame 도 같은 기준으로 한 번 더 막는다) */
+function rsToday(){return fmtDate(kstNow())}
+function rsCanEdit(date){return !!adminPw||date===rsToday()}
+/* 오늘 날짜에 해당하는 진행일. 설정된 진행일이 없으면 'O요일' */
+function rsTodayDay(){
+  const t=rsToday();
+  const m=currentDays.find(d=>fmtDate(dayDateInWeek(d.title))===t);
+  return m?m.title:WD_NAMES[kstNow().getDay()]+'요일';
+}
+
+/* ===== 이탈 방지 (뒤로가기 · 새로고침 · 바깥 누름) =====
+   기록 화면이 열려 있는 동안 history 에 항목을 하나 넣어 두고,
+   뒤로가기로 그 항목이 빠지면 다시 넣은 뒤 나갈지 묻는다. */
+let _rsGuard=false,_rsGuardSkip=false;
+function rsGuardOn(){
+  if(_rsGuard)return;
+  _rsGuard=true;
+  try{history.pushState({rsGuard:1},'')}catch(e){}
+}
+function rsGuardOff(){
+  if(!_rsGuard)return;
+  _rsGuard=false;
+  try{if(history.state&&history.state.rsGuard){_rsGuardSkip=true;history.back()}}catch(e){}
+}
+window.addEventListener('popstate',()=>{
+  if(_rsGuardSkip){_rsGuardSkip=false;return}
+  if(!_rsGuard)return;
+  _rsGuard=false;                                   // 보호 항목은 방금 빠졌다
+  const popOpen=document.getElementById('alertLayer').classList.contains('show');
+  if(!popOpen&&!rsUnsaved()){closeModal();return}  // 잃을 기록이 없으면 그냥 닫는다
+  rsGuardOn();
+  if(popOpen){closePopup();return}                 // 떠 있는 팝업부터 닫는다
+  rsLeaveAsk();
+});
+window.addEventListener('beforeunload',(e)=>{
+  if(_rsGuard&&rsUnsaved()){e.preventDefault();e.returnValue=''}
+});
+function rsLeaveAsk(){
+  popupHtml('<h3>기록 입력 중입니다</h3>'+
+    '<p class="pop-msg">저장하지 않은 기록이 있습니다.\n나가도 기기에 임시 저장되어, 다시 들어오면 이어서 입력할 수 있습니다.</p>'+
+    rsResumeInfoHtml({recorder:rsRecorder,mode:rsInMode,date:rsDate,day:rsDay,game:rsGame,match:rsMatch,teams:rsTeams})+
+    '<div class="modal-actions">'+
+    '<button class="btn-secondary" onclick="closePopup();closeModal()">나가기</button>'+
+    '<button class="btn-primary" onclick="closePopup()">계속 입력</button></div>');
+}
+/* 기록지 '닫기' 버튼: 저장 안 한 기록이 있으면 한 번 확인 */
+function rsCloseAsk(){if(rsUnsaved())rsLeaveAsk(); else closeModal()}
+
+/* 이어서 입력 / 나가기 확인 창에 보여줄 요약 (기록자 이름 포함) */
+function rsResumeInfoHtml(d){
+  const teams=d.teams||[],match=d.match||[];
+  const lbl=i=>teams[i]?esc(teams[i].label)+'팀':'-';
+  const team=d.mode==='team'
+    ? '팀별 입력 · <b>'+lbl(match[0])+'</b> 기록'
+    : '혼자 입력 · '+lbl(match[0])+' vs '+lbl(match[1]);
+  return '<div class="rs-resume">'+
+    '✍️ 기록자 <b>'+esc(d.recorder||'(미입력)')+'</b><br>'+
+    '📅 '+esc((d.date||'-')+' '+(d.day||''))+' · <b>'+(d.game||1)+'게임</b><br>'+
+    '👥 '+team+'</div>';
+}
+
 /* ===== 진입 ===== */
 document.getElementById('sheetBtn').addEventListener('click',()=>{
-  if(!rsDay&&currentDays.length)rsDay=currentDays[0].title;
-  if(!rsDate)rsDate=fmtDate(dayDateInWeek(rsDay));
   const d=rsReadDraft();
-  if(d&&!rsTeams.length&&!rsDraftHasInput(d)){
-    // 입력한 기록이 없는 임시저장이면 굳이 묻지 않고 팀·날짜만 이어받는다
-    rsDate=d.date||rsDate;rsDay=d.day||rsDay;rsTeams=d.teams||[];
-    rsGame=d.game||1;rsMatch=d.match||[0,1];rsStats=d.stats||{};
-    rsRenderSetup();
-  }else if(d&&!rsTeams.length){
-    rsRenderSetup();
-    popupHtml('<h3>이어서 입력할까요?</h3>'+
-      '<p class="pop-msg">저장하지 않은 기록이 남아 있습니다.\n'+
-      esc(d.date+' '+d.day+' '+d.game+'게임')+'</p>'+
-      '<div class="modal-actions">'+
-      '<button class="btn-secondary" onclick="rsDropDraft()">새로 시작</button>'+
-      '<button class="btn-primary" onclick="rsResumeDraft()">이어서 입력</button></div>');
-  }else{
-    rsRenderSetup();
+  if(d&&rsDraftHasInput(d)){rsAskResume(d);return}         // 저장 안 한 기록 → 이어서?
+  if(rsTeams.length&&rsRecorder&&rsCanEdit(rsDate)){rsRenderSetup();return}   // 이번 접속에서 쓰던 설정 그대로
+  if(d&&d.recorder&&d.date===rsToday()){                   // 기록 없는 오늘 임시저장 → 팀·날짜만 이어받는다
+    rsApplyDraft(d);rsRenderSetup();return;
   }
+  rsRenderStart();
 });
+function rsAskResume(d){
+  rsRenderStart();
+  popupHtml('<h3>이어서 입력할까요?</h3>'+
+    '<p class="pop-msg">저장하지 않은 기록이 남아 있습니다.</p>'+
+    rsResumeInfoHtml(d)+
+    (rsCanEdit(d.date)?'':'<div class="rs-warn" style="margin-top:8px">지난 날짜 기록이라 저장은 <b>관리자 로그인</b> 후에만 됩니다.</div>')+
+    '<div class="modal-actions">'+
+    '<button class="btn-secondary" onclick="rsDropDraftAsk()">새로 시작</button>'+
+    '<button class="btn-primary" onclick="rsResumeDraft()">이어서 입력</button></div>');
+}
+function rsApplyDraft(d){
+  rsDate=d.date;rsDay=d.day;rsTeams=d.teams||[];rsGame=d.game||1;
+  rsInMode=d.mode==='team'?'team':'solo';
+  rsRecorder=d.recorder||rsRecorder;
+  rsMatch=d.match||[0,1];rsStats=d.stats||{};rsHist=[];
+  rsPast=d.date!==rsToday();
+  rsFixMatch();
+}
 function rsResumeDraft(){
   const d=rsReadDraft();
   closePopup();
   if(!d)return;
-  rsDate=d.date;rsDay=d.day;rsTeams=d.teams;rsGame=d.game||1;
-  rsMatch=d.match||[0,1];rsStats=d.stats||{};rsHist=[];
+  rsApplyDraft(d);
+  if(!rsRecorder){rsRenderStart();return}
+  // 기록 화면에서 나갔던 거라면 곧바로 기록 화면으로
+  if(d.view==='sheet'){rsTab=0;rsRenderSheet()} else rsRenderSetup();
+}
+/* 새로 시작하면 남은 기록이 지워지므로 한 번 더 확인한다 */
+function rsDropDraftAsk(){
+  const d=rsReadDraft();
+  popupHtml('<h3>새로 시작할까요?</h3>'+
+    '<p class="pop-msg">저장하지 않은 아래 기록이 지워집니다.</p>'+
+    (d?rsResumeInfoHtml(d):'')+
+    '<div class="modal-actions">'+
+    '<button class="btn-secondary" onclick="rsAskResume(rsReadDraft()||{})">돌아가기</button>'+
+    '<button class="btn-danger" onclick="rsDropDraft()">지우고 새로 시작</button></div>');
+}
+function rsDropDraft(){
+  rsClearDraft();
+  rsTeams=[];rsStats={};rsHist=[];rsGame=1;rsMatch=[0,1];rsPast=false;
+  closePopup();rsRenderStart();
+}
+function rsFixMatch(){
+  const n=rsTeams.length;
+  if(rsInMode==='team'){rsMatch=[(rsMatch[0]>=0&&rsMatch[0]<n)?rsMatch[0]:0];return}
+  if(rsMatch.length<2||rsMatch[0]>=n||rsMatch[1]>=n||rsMatch[0]===rsMatch[1])rsMatch=[0,Math.min(1,Math.max(0,n-1))];
+}
+
+/* ===== 시작 화면 (기록자 이름 → 입력 방식) ===== */
+let rsStartMode='solo';
+function rsRenderStart(){
+  rsView='start';
+  rsStartMode=rsInMode;
+  let last=rsRecorder;
+  if(!last){try{last=localStorage.getItem(RS_REC_KEY)||''}catch(e){}}
+  if(!last&&currentMember&&currentMember.name)last=currentMember.name;
+  const listed=currentMembers.filter(m=>!rsIsGuest(m)).map(m=>'<option value="'+esc(m.name)+'"></option>').join('');
+  openModal(
+    '<div class="rs-hd"><h3>📝 기록 입력</h3></div>'+
+    '<div class="field"><label class="main-label">기록자 (입력하는 회원)</label>'+
+    '<input type="text" id="rsRecName" list="rsRecList" autocomplete="off" placeholder="본인 이름 입력 또는 선택" value="'+esc(last)+'" />'+
+    '<datalist id="rsRecList">'+listed+'</datalist></div>'+
+    '<div class="field"><label class="main-label">입력 방식</label><div class="rs-modepick" id="rsModePick">'+rsModeBtnsHtml()+'</div></div>'+
+    '<div class="modal-actions">'+
+    '<button class="btn-secondary" onclick="closeModal()">닫기</button>'+
+    '<button class="btn-primary" onclick="rsStartNext()">다음 →</button></div>',
+    true
+  );
+  rsGuardOn();
+  setTimeout(()=>{
+    const el=document.getElementById('rsRecName');
+    if(el&&!el.value)el.focus();
+    if(el)el.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();rsStartNext()}});
+  },80);
+}
+function rsModeBtnsHtml(){
+  return '<button type="button" class="rs-modebtn'+(rsStartMode==='solo'?' on':'')+'" onclick="rsPickStartMode(\'solo\')">'+
+      '<b>👤 혼자 입력</b><span>한 사람이 두 팀 기록을 모두 입력하고 한 번에 저장합니다.</span></button>'+
+    '<button type="button" class="rs-modebtn'+(rsStartMode==='team'?' on':'')+'" onclick="rsPickStartMode(\'team\')">'+
+      '<b>👥 팀별 입력 (실시간)</b><span>한 사람이 한 팀씩 맡아 각자 폰에서 입력·저장합니다. 상대 팀 기록은 건드리지 않습니다.</span></button>';
+}
+function rsPickStartMode(m){
+  rsStartMode=m;
+  const box=document.getElementById('rsModePick');
+  if(box)box.innerHTML=rsModeBtnsHtml();
+}
+function rsStartNext(){
+  const el=document.getElementById('rsRecName');
+  const name=String((el&&el.value)||'').trim();
+  if(!name){toast('기록자 이름을 입력하세요','error');if(el)el.focus();return}
+  // 명단을 불러온 경우에만 회원인지 확인한다 (명단이 비어 있으면 막지 않음)
+  if(currentMembers.length&&!currentMembers.some(m=>m.name===name&&!rsIsGuest(m))){
+    toast('회원 명단에 있는 이름을 입력하세요','error');return;
+  }
+  rsRecorder=name;
+  try{localStorage.setItem(RS_REC_KEY,name)}catch(e){}
+  const modeChanged=rsStartMode!==rsInMode;
+  rsInMode=rsStartMode;
+  if(modeChanged){rsMatch=[0,1];rsTab=0;rsGameTouched=false}
+  rsFixMatch();
+  // 처음 들어왔거나 수정할 수 없는 날짜에 머물러 있으면 오늘로 맞춘다
+  if(!rsTeams.length||!rsCanEdit(rsDate)){
+    rsPast=false;rsDay=rsTodayDay();rsDate=rsToday();
+    rsTeams=[];rsStats={};rsHist=[];rsGameTouched=false;
+    rsRenderSetup();
+    rsLoadTeams();
+    return;
+  }
+  rsSaveDraft();
   rsRenderSetup();
 }
-function rsDropDraft(){rsClearDraft();closePopup();rsRenderSetup()}
 
 /* ===== 설정 화면 (진행일·날짜 선택 → 팀 불러오기 → 대결 선택) ===== */
 function rsIsWide(){return window.innerWidth>=900}
@@ -1734,12 +1921,59 @@ function rsDateLineHtml(){
     '</div>';
 }
 
+/* 설정 화면의 팀 카드 (명단 추가·빼기) */
+function rsTeamCardHtml(t,i){
+  const posTag=(p)=>'<span class="pos">'+({가드:'G',포워드:'F',센터:'C'}[p]||'-')+'</span>';
+  return '<div class="rs-card">'+
+    '<h5><span class="rs-chip" style="background:#eee;color:#444">'+esc(t.label)+'팀</span>'+
+    '<span style="font-weight:600;color:#777;font-size:.82rem">'+t.members.length+'명</span>'+
+    '<button class="rs-mini" onclick="rsSetupAdd('+i+')">＋ 선수·게스트</button>'+
+    (rsTeams.length>2?'<button class="rs-mini del" onclick="rsRemoveTeam('+i+')" title="팀 제거">팀 제거</button>':'')+
+    '</h5>'+
+    '<div class="rs-plist">'+
+    (t.members.map((m,mi)=>
+      '<span class="rs-pchip'+(rsIsGuest(m)?' guest':'')+'">'+posTag(m.position)+esc(m.name)+rsGuestTag(m)+
+      '<button onclick="rsSetupDel('+i+','+mi+')" title="빼기">✕</button></span>').join('')
+      ||'<span class="rs-empty">＋ 선수·게스트 를 눌러 명단을 입력하세요</span>')+
+    '</div>'+
+  '</div>';
+}
+/* 유니폼색 고르기 (팀별 입력 설정 화면에서 바로) */
+function rsSwatchHtml(ti){
+  const t=rsTeamAt(ti);
+  if(!t)return '';
+  const c=t.color||'#8d8d8d';
+  return '<div class="rs-sw">'+RS_PRESET.map(p=>
+    '<button class="rs-swb'+(String(c).toLowerCase()===p.c?' on':'')+'" title="'+p.n+'" '+
+    'style="background:'+p.c+'" onclick="rsSetColor('+ti+',\''+p.c+'\')"></button>').join('')+
+    '<input type="color" value="'+esc(c)+'" onchange="rsSetColor('+ti+',this.value)" '+
+    'style="width:34px;height:28px;padding:0;border:1px solid #ddd;border-radius:6px;background:none;cursor:pointer" />'+
+    '</div>';
+}
+function rsGameFieldHtml(){
+  return '<div class="tg-field"><label>게임 번호</label><div class="rs-inline">'+
+    '<input type="number" id="rsGameInput" min="1" max="99" value="'+rsGame+'" onchange="rsSetGame(this.value)" style="width:90px" />'+
+    '<span style="font-size:.8rem;color:#888">'+
+    (rsInMode==='team'
+      ? '상대 팀 기록자와 <b>같은 게임 번호</b>로 맞춰 주세요. 같은 날짜·게임·팀으로 다시 저장하면 그 팀 기록만 덮어씁니다'
+      : '같은 날짜·같은 게임 번호로 저장하면 기존 기록을 덮어씁니다')+
+    '</span></div></div>';
+}
+
 function rsRenderSetup(){
   rsView='setup';
+  rsAutoGame();
+  const today=rsToday();
   const dayBtns=currentDays.map(d=>
-    '<button class="tg-btn'+(!rsPast&&rsDay===d.title?' active':'')+'" onclick="rsPickDay(\''+jsq(d.title)+'\')">'+esc(d.title)+'</button>'
+    '<button class="tg-btn'+(!rsPast&&rsDay===d.title?' active':'')+'" onclick="rsPickDay(\''+jsq(d.title)+'\')">'+esc(d.title)+
+    (fmtDate(dayDateInWeek(d.title))===today?' (오늘)':'')+'</button>'
   ).join('')||'<span style="font-size:.85rem;color:#aaa">진행일이 설정되지 않았습니다</span>';
-  const pastBtn='<button class="tg-btn'+(rsPast?' active':'')+'" onclick="rsPastDialog()">📅 지난 경기 입력</button>';
+  const pastBtn='<button class="tg-btn'+(rsPast?' active':'')+'" onclick="rsPastGate()">📅 지난 경기'+(adminPw?' 입력':' (관리자)')+'</button>';
+  const lockNotice=rsCanEdit(rsDate)?'':
+    '<div class="rs-warn">회원은 <b>경기 당일('+esc(today)+')</b> 기록만 입력·수정할 수 있습니다.<br>'+
+    '지난 기록은 <b>📅 지난 경기 (관리자)</b> 로 로그인하거나 구글시트에서 직접 고쳐 주세요.</div>';
+  const who='<span class="rs-who">✍️ '+esc(rsRecorder||'-')+' · '+(rsInMode==='team'?'팀별':'혼자')+
+    '<button onclick="rsRenderStart()">변경</button></span>';
 
   const emptyPast=(rsPast&&rsTeams.length&&!rsTeams.some(t=>t.members.length))
     ? '<div class="rs-warn">이 날짜로 저장된 팀이 없습니다. 아래에서 팀을 직접 입력해 주세요.</div>'
@@ -1751,23 +1985,24 @@ function rsRenderSetup(){
     : '';
 
   let teamsHtml='';
-  if(rsTeams.length){
-    const posTag=(p)=>'<span class="pos">'+({가드:'G',포워드:'F',센터:'C'}[p]||'-')+'</span>';
-    teamsHtml=rsTeams.map((t,i)=>
-      '<div class="rs-card">'+
-        '<h5><span class="rs-chip" style="background:#eee;color:#444">'+esc(t.label)+'팀</span>'+
-        '<span style="font-weight:600;color:#777;font-size:.82rem">'+t.members.length+'명</span>'+
-        '<button class="rs-mini" onclick="rsSetupAdd('+i+')">＋ 선수·게스트</button>'+
-        (rsTeams.length>2?'<button class="rs-mini del" onclick="rsRemoveTeam('+i+')" title="팀 제거">팀 제거</button>':'')+
-        '</h5>'+
-        '<div class="rs-plist">'+
-        (t.members.map((m,mi)=>
-          '<span class="rs-pchip'+(rsIsGuest(m)?' guest':'')+'">'+posTag(m.position)+esc(m.name)+rsGuestTag(m)+
-          '<button onclick="rsSetupDel('+i+','+mi+')" title="빼기">✕</button></span>').join('')
-          ||'<span class="rs-empty">＋ 선수·게스트 를 눌러 명단을 입력하세요</span>')+
-        '</div>'+
-      '</div>'
+  if(rsTeams.length&&rsInMode==='team'){
+    // 팀별 입력: 게임 번호 → 기록할 팀 → 유니폼색 → 그 팀 명단만 수정
+    const my=rsMatch[0];
+    const teamBtns=rsTeams.map((t,i)=>
+      '<button class="tg-btn'+(i===my?' active':'')+'" onclick="rsSetMyTeam('+i+')">'+esc(t.label)+'팀 ('+t.members.length+'명)</button>'
     ).join('');
+    teamsHtml=
+      rsGameFieldHtml()+
+      '<div class="tg-field"><label>내가 기록할 팀</label><div class="tg-btn-row">'+teamBtns+'</div></div>'+
+      '<div class="tg-field"><label>유니폼색</label>'+rsSwatchHtml(my)+'</div>'+
+      '<div class="tg-field"><label>선수 명단 (수정·추가)</label></div>'+
+      (rsTeamAt(my)?rsTeamCardHtml(rsTeamAt(my),my):'')+
+      '<p class="ps-note">상대 팀은 다른 기록자가 자기 폰에서 <b>팀별 입력</b>으로 같은 게임 번호를 골라 따로 입력합니다.</p>'+
+      '<div class="modal-actions">'+
+      '<button class="btn-secondary" onclick="rsAddTeam()">+ 팀 추가</button>'+
+      '<button class="btn-primary" onclick="rsStart()"'+(rsCanEdit(rsDate)?'':' disabled')+'>▶ 기록 시작</button></div>';
+  }else if(rsTeams.length){
+    teamsHtml=rsTeams.map((t,i)=>rsTeamCardHtml(t,i)).join('');
 
     // 대결 조합 버튼
     const pairs=[];
@@ -1781,13 +2016,11 @@ function rsRenderSetup(){
     teamsHtml+=
       '<div class="tg-field" style="margin-top:14px"><label>대결 팀</label><div class="tg-btn-row">'+
       (pairBtns||'<span style="font-size:.85rem;color:#aaa">팀이 2개 이상이어야 합니다</span>')+'</div></div>'+
-      '<div class="tg-field"><label>게임 번호</label><div class="rs-inline">'+
-      '<input type="number" min="1" max="99" value="'+rsGame+'" onchange="rsSetGame(this.value)" style="width:90px" />'+
-      '<span style="font-size:.8rem;color:#888">같은 날짜·같은 게임 번호로 저장하면 기존 기록을 덮어씁니다</span></div></div>'+
+      rsGameFieldHtml()+
       '<p class="ps-note">유니폼색은 기록지를 시작한 뒤 <b>🎽 유니폼색</b> 버튼에서 게임마다 바꿀 수 있습니다.</p>'+
       '<div class="modal-actions">'+
       '<button class="btn-secondary" onclick="rsAddTeam()">+ 팀 추가</button>'+
-      '<button class="btn-primary" onclick="rsStart()">▶ 기록 시작</button></div>';
+      '<button class="btn-primary" onclick="rsStart()"'+(rsCanEdit(rsDate)?'':' disabled')+'>▶ 기록 시작</button></div>';
   }else{
     teamsHtml=
       '<div class="rs-warn">불러온 팀이 없습니다.<br>'+
@@ -1798,20 +2031,158 @@ function rsRenderSetup(){
   }
 
   openModal(
-    '<div class="rs-hd"><h3>📝 기록 입력</h3></div>'+
+    '<div class="rs-hd"><h3>📝 기록 입력</h3>'+who+'</div>'+
     rsDateLineHtml()+
+    '<div class="rs-prog" id="rsProg">'+rsProgHtml()+'</div>'+
     '<div class="tg-field"><label>진행일 (누르면 저장된 팀을 불러옵니다)</label>'+
     '<div class="tg-btn-row">'+dayBtns+pastBtn+'</div></div>'+
-    fromNotice+emptyPast+
+    lockNotice+fromNotice+emptyPast+
     '<div id="rsSetupBody">'+teamsHtml+'</div>'+
     '<div style="text-align:center;margin-top:16px">'+
-    '<button class="rs-tool" onclick="closeModal()">닫기</button></div>',
+    '<button class="rs-tool" onclick="rsCloseAsk()">닫기</button></div>',
     true
   );
+  rsGuardOn();
+  rsRenderProg();
+  rsLoadStatus();
+}
+// 맡은 팀이 바뀌면 다음 게임 번호도 그 팀 기준으로 다시 잡는다
+function rsSetMyTeam(i){rsMatch=[i];rsTab=0;rsGameTouched=false;rsSaveDraft();rsRenderSetup()}
+
+/* ===== 그 날 게임 진행 현황 =====
+   기록 입력 기본 화면에 '몇 게임까지 저장됐는지'를 보여주고, 다음에 입력할 게임 번호를 잡아 준다.
+   게임 번호를 직접 바꾼 뒤(rsGameTouched)에는 자동으로 바꾸지 않는다. */
+let rsStatus=null,rsStatusBusy=false,rsGameTouched=false;
+const RS_STATUS_TTL=20000;   // 이 시간 안에 다시 그릴 때는 서버를 다시 부르지 않는다
+function rsLoadStatus(force){
+  const date=rsDate;
+  if(!date||rsStatusBusy)return;
+  if(!force&&rsStatus&&rsStatus.date===date&&Date.now()-rsStatus.t<RS_STATUS_TTL)return;
+  rsStatusBusy=true;
+  if(!rsStatus||rsStatus.date!==date)rsStatus={date,t:0,games:null};
+  fetchJsonp(SCRIPT_URL,{action:'gameStatus',date})
+    .then(r=>{
+      // 서버가 아직 이 기능을 모르면(배포 전) 현황 칸을 숨긴다
+      rsStatus={date,t:Date.now(),games:(r&&r.ok)?(r.games||[]):undefined};
+    })
+    .catch(()=>{rsStatus={date,t:Date.now(),games:undefined}})
+    .finally(()=>{
+      rsStatusBusy=false;
+      if(rsDate!==date)return;
+      rsAutoGame();
+      rsRenderProg();
+    });
+}
+/* 다음에 입력할 게임 번호.
+   팀별 입력: 상대 팀만 저장되고 내 팀은 아직인 게임이 있으면 그 게임, 아니면 마지막 게임 + 1 */
+function rsNextGameNo(){
+  const gs=(rsStatus&&rsStatus.games)||[];
+  if(!gs.length)return 1;
+  if(rsInMode==='team'){
+    const my=rsTeamAt(rsMatch[0]);
+    const wait=my&&gs.find(g=>g.teams.length===1&&g.teams[0].label!==my.label);
+    if(wait)return wait.game;
+  }
+  return gs[gs.length-1].game+1;
+}
+function rsAutoGame(){
+  if(rsGameTouched||rsHasInput()||!rsStatus||!rsStatus.games)return;
+  const n=rsNextGameNo();
+  if(n===rsGame)return;
+  rsGame=n;
+  rsSaveDraft();
+  const inp=document.getElementById('rsGameInput');
+  if(inp)inp.value=n;
+}
+function rsProgHtml(){
+  if(!rsStatus||rsStatus.date!==rsDate||rsStatus.games===null)
+    return '<div class="pg-empty">진행 현황을 불러오는 중...</div>';
+  const gs=rsStatus.games||[];
+  if(!gs.length)
+    return '<div class="pg-hd">📋 진행 현황<span class="pg-next">다음 입력 1게임</span></div>'+
+      '<div class="pg-empty">'+esc(rsDate)+' 에 저장된 게임이 아직 없습니다.</div>';
+  const my=rsInMode==='team'?rsTeamAt(rsMatch[0]):null;
+  const rows=gs.map(g=>{
+    const chip=t=>{const c=t.color||'#8d8d8d';
+      return '<span class="tc" style="background:'+esc(c)+';color:'+rsFg(c)+'">'+esc(t.label)+'</span>'};
+    let score;
+    if(g.teams.length>=2){
+      score=g.teams.map(t=>chip(t)+' <span class="sc">'+t.pts+'</span>').join(' : ');
+    }else{
+      const t=g.teams[0];
+      score=chip(t)+' <span class="sc">'+t.pts+'</span> <span class="wait">· 상대 팀 대기</span>';
+    }
+    const who=g.teams.map(t=>t.recorder).filter((v,i,a)=>v&&a.indexOf(v)===i).join('·');
+    const at=g.teams.map(t=>t.at).filter(Boolean).sort().pop()||'';
+    const mine=my&&g.teams.some(t=>t.label===my.label);
+    const cur=g.game===rsGame;
+    return '<button type="button" class="rs-pg'+(cur?' cur':'')+'" onclick="rsPickGame('+g.game+')" title="눌러서 이 게임 번호로">'+
+      '<span class="g">'+g.game+'게임</span>'+score+
+      (cur?' <span class="now">← 입력 중'+(rsInMode==='team'&&!mine?'':' (다시 저장하면 덮어씀)')+'</span>':'')+
+      '<span class="who">'+(who?'✍️ '+esc(who)+' ':'')+esc(at)+'</span></button>';
+  }).join('');
+  const last=gs[gs.length-1].game;
+  return '<div class="pg-hd">📋 진행 현황 <b>'+last+'게임까지 저장됨</b>'+
+    '<span class="pg-next">다음 입력 '+rsNextGameNo()+'게임</span></div>'+rows;
+}
+function rsRenderProg(){
+  const el=document.getElementById('rsProg');
+  if(!el)return;
+  if(rsStatus&&rsStatus.date===rsDate&&rsStatus.games===undefined){el.hidden=true;return}
+  el.hidden=false;
+  el.innerHTML=rsProgHtml();
+}
+/* 현황에서 게임을 누르면 그 게임 번호로 (이미 저장된 게임을 고치거나, 상대 팀 대기 게임을 이어 입력) */
+function rsPickGame(g){
+  rsGame=g;rsGameTouched=true;
+  rsSaveDraft();
+  const inp=document.getElementById('rsGameInput');
+  if(inp)inp.value=g;
+  rsRenderProg();
+}
+/* 지난 경기는 관리자만 입력·수정한다 */
+function rsPastGate(){
+  if(adminPw){rsPastDialog();return}
+  rsAdminLogin(rsPastDialog);
+}
+let _rsAdmNext=null;
+function rsAdminLogin(next){
+  _rsAdmNext=next||null;
+  popupHtml('<h3>⚙️ 관리자 로그인</h3>'+
+    '<p class="pop-sub">지난 경기 기록은 관리자만 입력·수정할 수 있습니다.</p>'+
+    '<div class="field"><label class="main-label">비밀번호</label>'+
+    '<input type="password" id="rsAdmPw" placeholder="비밀번호" autocomplete="off" /></div>'+
+    '<div class="modal-actions"><button class="btn-secondary" onclick="closePopup()">취소</button>'+
+    '<button class="btn-primary" id="rsAdmBtn" onclick="rsAdminAuth()">로그인</button></div>');
+  setTimeout(()=>{
+    const el=document.getElementById('rsAdmPw');
+    if(el){el.focus();el.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();rsAdminAuth()}})}
+  },80);
+}
+async function rsAdminAuth(){
+  const el=document.getElementById('rsAdmPw');
+  const pw=(el&&el.value)||'';
+  if(!pw){toast('비밀번호를 입력하세요','error');return}
+  const btn=document.getElementById('rsAdmBtn');
+  if(btn){btn.disabled=true;btn.textContent='확인 중...'}
+  try{
+    const r=await fetchJsonp(SCRIPT_URL,{action:'adminAuth',password:pw});
+    if(r&&r.ok){
+      adminPw=pw;
+      toast('관리자로 로그인했습니다','success');
+      const next=_rsAdmNext;_rsAdmNext=null;
+      closePopup();
+      if(next)next(); else if(rsView==='setup')rsRenderSetup();
+      return;
+    }
+    toast('비밀번호가 틀렸습니다','error');
+  }catch(e){toast('통신 실패','error')}
+  const b=document.getElementById('rsAdmBtn');
+  if(b){b.disabled=false;b.textContent='로그인'}
 }
 /* 이번 주 해당 요일로 팀을 불러온다 */
 function rsPickDay(title){
-  rsPast=false;
+  rsPast=false;rsGameTouched=false;
   rsDay=title;
   rsDate=fmtDate(dayDateInWeek(title));
   rsLoadTeams();
@@ -1880,7 +2251,7 @@ function rsPickPast(date){
 function rsPickPastGo(date){
   closePopup();
   rsStats={};rsHist=[];      // 날짜가 바뀌면 입력 중이던 기록은 비운다
-  rsPast=true;
+  rsPast=true;rsGameTouched=false;
   rsDate=date;
   const saved=rsMarks[date];
   const d=parseDate(date);
@@ -1922,14 +2293,14 @@ async function rsLoadTeams(){
           members:(t.members||[]).map(m=>({name:m.name,position:m.position||'',memberType:m.memberType||''}))
         }));
         rsTeams.forEach(t=>t.members.forEach(m=>rsGet(m.name)));
-        if(rsMatch[0]>=rsTeams.length||rsMatch[1]>=rsTeams.length)rsMatch=[0,Math.min(1,rsTeams.length-1)];
+        rsFixMatch();
         rsSaveDraft();
       }else if(rsPast){
         // 지난 경기는 "불러오기"가 아니라 "입력"이다.
         // 저장분이 없으면 빈 팀만 준비하고, 설정 화면에서 바로 명단을 넣는다.
         rsTeams=[{label:'A',color:rsDefaultColor(0),members:[]},
                  {label:'B',color:rsDefaultColor(1),members:[]}];
-        rsMatch=[0,1];
+        rsMatch=[0,1];rsFixMatch();
       }else if(rsTeams.some(t=>t.members.length)){
         // 저장된 팀이 없더라도 직접 구성해 둔 팀은 지우지 않는다 (그대로 수정해서 쓰면 됨)
         toast(rsDate+' 로 저장된 팀이 없어 현재 팀을 그대로 씁니다','error');
@@ -1944,7 +2315,7 @@ async function rsLoadTeams(){
 }
 function rsBlankTeams(){
   rsTeams=[{label:'A',color:rsDefaultColor(0),members:[]},{label:'B',color:rsDefaultColor(1),members:[]}];
-  rsMatch=[0,1];
+  rsMatch=[0,1];rsFixMatch();
   rsSaveDraft();rsRenderSetup();
 }
 function rsAddTeam(){
@@ -1976,7 +2347,7 @@ function rsRemoveTeamGo(i){
   });
   // A,B,C… 로 라벨을 다시 매긴다 (YB/OB 처럼 직접 지은 이름은 건드리지 않는다)
   rsTeams.forEach((t,k)=>{if(/^[A-Z]$/.test(t.label))t.label=String.fromCharCode(65+k)});
-  rsMatch=[0,Math.min(1,rsTeams.length-1)];
+  rsMatch=[0,Math.min(1,rsTeams.length-1)];rsFixMatch();
   rsSaveDraft();rsRenderSetup();
   toast('팀을 제거했습니다','success');
 }
@@ -2010,13 +2381,22 @@ function rsSetColor(i,c){
   else rsRenderSetup();
 }
 function rsSetMatch(a,b){rsMatch=[a,b];rsTab=0;rsSaveDraft();rsRenderSetup()}
-function rsSetGame(v){rsGame=Math.max(1,parseInt(v,10)||1);rsSaveDraft()}
+function rsSetGame(v){rsGame=Math.max(1,parseInt(v,10)||1);rsGameTouched=true;rsSaveDraft();rsRenderProg()}
 function rsStart(){
-  if(rsTeams.length<2){toast('팀이 2개 이상 필요합니다','error');return}
+  if(!rsRecorder){rsRenderStart();return}
   if(!rsDate){toast('날짜를 선택해 주세요','error');return}
-  if(rsMatch[0]===rsMatch[1]){toast('서로 다른 두 팀을 선택해 주세요','error');return}
+  if(!rsCanEdit(rsDate)){toast('당일 경기만 입력할 수 있습니다 (지난 경기는 관리자)','error');return}
+  if(rsInMode==='team'){
+    const t=rsTeamAt(rsMatch[0]);
+    if(!t){toast('기록할 팀을 선택해 주세요','error');return}
+    if(!t.members.length){toast(t.label+'팀 선수를 먼저 추가해 주세요','error');return}
+  }else{
+    if(rsTeams.length<2){toast('팀이 2개 이상 필요합니다','error');return}
+    if(rsMatch[0]===rsMatch[1]){toast('서로 다른 두 팀을 선택해 주세요','error');return}
+  }
   rsTab=0;rsMode=1;
   rsRenderSheet();
+  rsSaveDraft();   // 기록 화면에 들어갔다는 것(view)까지 남겨 두면 이어서 입력 시 바로 이 화면으로 온다
 }
 
 /* ===== 기록지 본화면 ===== */
@@ -2109,9 +2489,10 @@ function rsRenderSheet(){
   openModal(
     '<div class="rs-toolbar">'+
       '<div class="rs-hd"><h3 style="font-size:1.02rem">📝 기록 입력</h3>'+
-      '<span class="rs-sub">'+esc(rsDate)+' · '+esc(rsDay||'-')+' · '+rsGame+'게임</span>'+
+      '<span class="rs-sub">'+esc(rsDate)+' · '+esc(rsDay||'-')+' · '+rsGame+'게임 · ✍️ '+esc(rsRecorder||'-')+
+      (rsInMode==='team'&&rsTeamAt(rsMatch[0])?' ('+esc(rsTeamAt(rsMatch[0]).label)+'팀 담당)':'')+'</span>'+
       // 넓은 화면에서는 닫기를 제목 줄로 올려 아래쪽 표가 들어갈 높이를 확보한다
-      (wide?'<button class="rs-tool rs-x" onclick="closeModal()">닫기</button>':'')+'</div>'+
+      (wide?'<button class="rs-tool rs-x" onclick="rsCloseAsk()">닫기</button>':'')+'</div>'+
       '<div class="rs-top">'+
         '<div class="rs-score" id="rsScore">'+rsScoreHtml()+'</div>'+
         '<div class="rs-row rs-modes">'+
@@ -2140,9 +2521,10 @@ function rsRenderSheet(){
       '선수 이름을 누르면 팀 이동·제외를 할 수 있습니다.'+
       (wide?'':' <b>위 점수판에서 팀을 누르면</b> 그 팀 기록지로 바뀝니다.')+'</p>'+
     (wide?'':'<div class="rs-foot">'+
-      '<button class="rs-tool" onclick="closeModal()">닫기</button></div>'),
+      '<button class="rs-tool" onclick="rsCloseAsk()">닫기</button></div>'),
     true
   );
+  rsGuardOn();
   const box=document.getElementById('modalBox');
   if(box)box.classList.add('rs-sheet');
   rsSetMode(rsMode);
@@ -2367,6 +2749,7 @@ let rsAddType='member',rsAddTeamSel=0,rsAddKeep='';
 function rsAddPlayerDialog(preTeam){
   rsAddType='member';
   rsAddTeamSel=(preTeam==null)?rsMatch[rsTab]:preTeam;
+  if(rsAddTeamSel==null)rsAddTeamSel=0;
   rsAddKeep='';
   rsAddRender();
 }
@@ -2458,17 +2841,25 @@ async function rsSaveGame(){
     };
   }).filter(Boolean);
   if(!teams.length||!teams.some(t=>t.players.length)){toast('저장할 선수가 없습니다','error');return}
+  if(!rsCanEdit(rsDate)){
+    popupMsg('회원은 경기 당일 기록만 저장할 수 있습니다.\n지난 기록은 관리자 로그인 후 저장하거나 구글시트에서 고쳐 주세요.\n(입력 내용은 기기에 임시 저장되어 있습니다)');
+    return;
+  }
 
   rsBusy=true;
   const btn=document.getElementById('rsSaveBtn');
   if(btn){btn.disabled=true;btn.textContent='저장 중...'}
   try{
-    const r=await fetchJsonp(SCRIPT_URL,{action:'saveGame',date:rsDate,day:rsDay,game:rsGame,teams});
+    const r=await fetchJsonp(SCRIPT_URL,{action:'saveGame',date:rsDate,day:rsDay,game:rsGame,teams,
+      recorder:rsRecorder,scope:rsInMode==='team'?'team':'all',password:adminPw||''});
     if(r&&r.ok){
       rsClearDraft();
+      rsStatus=null;rsGameTouched=false;   // 진행 현황을 새로 받아 다음 게임 번호를 다시 잡는다
+      const what=rsInMode==='team'?' · '+teams[0].label+'팀':'';
       popupHtml(
         '<h3>✅ 저장 완료</h3>'+
-        '<p class="pop-msg">저장되었습니다.\n'+esc(rsDate+' '+(rsDay||'')+' '+rsGame+'게임 ('+(r.count||0)+'명)')+'</p>'+
+        '<p class="pop-msg">저장되었습니다.\n'+esc(rsDate+' '+(rsDay||'')+' '+rsGame+'게임'+what+' ('+(r.count||0)+'명)')+
+        '\n기록자 '+esc(rsRecorder)+'</p>'+
         '<div class="modal-actions">'+
           '<button class="btn-secondary" onclick="closePopup()">계속 수정</button>'+
           '<button class="btn-secondary" onclick="rsVideoDialog()">🎬 영상 링크</button>'+
@@ -2484,27 +2875,27 @@ async function rsSaveGame(){
     if(b){b.disabled=false;b.textContent='💾 게임 저장'}
   }
 }
-/* ===== 영상 링크 등록 (기록지에서 바로) ===== */
-let rsVidScope='day';       // 'day' = 그 날 전체 / 'game' = 이 게임 전용
-let rsVidMap={};
+/* ===== 영상 링크 등록 (기록지에서 바로) =====
+   영상은 경기(게임)마다 따로 넣는다. 한 영상에 여러 경기가 있어도 게임별로 &t=초 만 달리 해서 넣는다.
+   (예전에 넣은 '그 날 전체' 링크(게임 0)는 게임 링크가 없을 때 계속 대신 쓰인다 — vidFind) */
+let rsVidMap={},rsVidGame=1;
 async function rsVideoDialog(){
   if(!rsDate){toast('날짜를 먼저 선택해 주세요','error');return}
+  rsVidGame=rsGame;
   popupHtml('<h3>🎬 영상 링크</h3><p class="ld">불러오는 중...</p>');
   try{
     const r=await fetchJsonp(SCRIPT_URL,{action:'getVideos',date:rsDate});
     rsVidMap=vidMap((r&&r.videos)||[]);
   }catch(e){rsVidMap={}}
-  const cur=rsVidMap[vidKey(rsDate,rsVidScope==='game'?rsGame:0)]||'';
+  const cur=rsVidMap[vidKey(rsDate,rsVidGame)]||'';
   popupHtml(
     '<h3>🎬 영상 링크</h3>'+
     '<p class="pop-sub">'+esc(rsDate)+(rsDay?' · '+esc(rsDay):'')+'<br>'+
     '유튜브 주소를 붙여넣으면 <b>선수 기록</b>과 <b>날짜별 보기</b>에서 ▶ 로 바로 열립니다.<br>'+
-    '주소 끝에 <b>&t=1200</b> 처럼 초를 붙이면 그 시점부터 재생됩니다.</p>'+
-    '<div class="field"><label class="main-label">적용 범위</label>'+
-    '<select id="rsVidScopeSel" onchange="rsVidScopeChange()">'+
-      '<option value="day"'+(rsVidScope==='day'?' selected':'')+'>이 날 전체 (모든 게임)</option>'+
-      '<option value="game"'+(rsVidScope==='game'?' selected':'')+'>'+rsGame+'게임 전용</option>'+
-    '</select></div>'+
+    '영상 하나에 여러 경기가 있으면 경기마다 주소 끝 <b>&t=1200</b>(초)만 다르게 넣어 주세요.</p>'+
+    '<div class="field"><label class="main-label">게임 번호</label>'+
+    '<div class="rs-inline"><input type="number" id="rsVidGame" min="1" max="99" value="'+rsVidGame+'" '+
+    'onchange="rsVidGameChange()" style="width:90px" /><span style="font-size:.85rem;color:#888">게임 영상</span></div></div>'+
     '<div class="field"><label class="main-label">영상 주소</label>'+
     '<input type="url" id="rsVidUrl" placeholder="https://youtu.be/..." value="'+esc(cur)+'" autocomplete="off" />'+
     '<div class="member-info show" style="margin-top:7px">비워 두고 저장하면 등록된 링크가 삭제됩니다. '+
@@ -2512,18 +2903,21 @@ async function rsVideoDialog(){
     '<div class="modal-actions"><button class="btn-secondary" onclick="closePopup()">취소</button>'+
     '<button class="btn-primary" id="rsVidSaveBtn" onclick="rsVidSave()">저장</button></div>');
 }
-function rsVidScopeChange(){
-  const sel=document.getElementById('rsVidScopeSel'),inp=document.getElementById('rsVidUrl');
-  if(!sel||!inp)return;
-  rsVidScope=sel.value;
-  inp.value=rsVidMap[vidKey(rsDate,rsVidScope==='game'?rsGame:0)]||'';
+function rsVidGameChange(){
+  const g=document.getElementById('rsVidGame'),inp=document.getElementById('rsVidUrl');
+  if(!g||!inp)return;
+  rsVidGame=Math.max(1,parseInt(g.value,10)||1);
+  g.value=rsVidGame;
+  inp.value=rsVidMap[vidKey(rsDate,rsVidGame)]||'';
 }
 async function rsVidSave(){
   const inp=document.getElementById('rsVidUrl');
   const raw=((inp&&inp.value)||'').trim();
   const url=raw?vidNorm(raw):'';
   if(raw&&!url){toast('영상 주소를 확인해 주세요','error');return}
-  const game=(rsVidScope==='game')?rsGame:0;
+  const g=document.getElementById('rsVidGame');
+  if(g)rsVidGame=Math.max(1,parseInt(g.value,10)||1);
+  const game=rsVidGame;
   const btn=document.getElementById('rsVidSaveBtn');
   if(btn){btn.disabled=true;btn.textContent='저장 중...'}
   try{
@@ -2531,7 +2925,7 @@ async function rsVidSave(){
     if(r&&r.ok){
       if(url)rsVidMap[vidKey(rsDate,game)]=url; else delete rsVidMap[vidKey(rsDate,game)];
       closePopup();
-      toast(url?'영상 링크를 저장했습니다':'영상 링크를 삭제했습니다','success');
+      toast(game+'게임 '+(url?'영상 링크를 저장했습니다':'영상 링크를 삭제했습니다'),'success');
     }else{toast((r&&r.message)||'저장 실패','error')}
   }catch(e){toast('통신 실패','error')}
   finally{
