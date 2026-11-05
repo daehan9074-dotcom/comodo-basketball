@@ -3372,7 +3372,8 @@ function psRenderSummary(){
   const rows=names.map(n=>byName[n]||
     {name:n,active:false,games:0,days:0,pts:0,totals:new Array(RS_KEYS.length).fill(0)});
 
-  // 경기 평균 득점순 (기록 없는 선수는 뒤로, 그 안에서는 이름순)
+  // 기본: 참석일 많은 순 → 같으면 승률 높은 순 → 같으면 경기 평균 득점순
+  // (기록 없는 선수는 뒤로, 그 안에서는 이름순)
   // 머리글을 눌러 정렬 항목을 고르면 그 값이 높은 순 (선수 이름은 가나다순)
   const sv=psSortVal(psSortKey);
   rows.sort((a,b)=>{
@@ -3380,6 +3381,8 @@ function psRenderSummary(){
     if(!a.active)return a.name<b.name?-1:1;
     if(psSortKey==='name')return a.name.localeCompare(b.name,'ko');
     if(sv){const d=sv(b)-sv(a);if(d)return d}
+    const dd=(b.days||0)-(a.days||0);if(dd)return dd;
+    const dw=psWinRate(b)-psWinRate(a);if(dw)return dw;
     return (b.pts/(b.games||1))-(a.pts/(a.games||1));
   });
 
@@ -3407,7 +3410,7 @@ function psRenderSummary(){
     '<div class="rs-hd"><h3>📈 선수 기록</h3><div style="display:flex;gap:6px">'+rotateBtnHtml()+
     '<button class="rs-tool" onclick="psOpenCalendar()">📅 날짜별 보기</button></div></div>'+
     '<p class="ps-note">선수마다 <b>실제 참석한 최근 '+PS_DAYS+'일</b>의 기록을 모아 <b>경기 1게임당 평균</b>으로 계산합니다. '+
-    '평균 득점이 높은 순으로 정렬되며, <b>표 머리글(항목)을 누르면 그 항목이 높은 순</b>으로 바뀝니다. (한 번 더 누르면 원래 순서)<br>'+
+    '<b>참석일이 많은 순</b>으로, 참석일이 같으면 <b>승률이 높은 순</b>으로 정렬되며, <b>표 머리글(항목)을 누르면 그 항목이 높은 순</b>으로 바뀝니다. (한 번 더 누르면 원래 순서)<br>'+
     '최근 '+PS_ACTIVE_MONTHS+'개월 안에 기록이 없는 선수는 비워 둡니다. '+
     '<b>게스트·휴활회원은 이 목록에서 빠지며</b>, 📅 날짜별 보기에서는 그대로 표시됩니다.'+
     (r.activeFrom?' (기준일 '+esc(r.activeFrom)+' 이후)':'')+'<br>'+
@@ -3465,13 +3468,33 @@ function psRenderPlayer(name,r){
         psCells(totals,pts,1)+'</tr>';
     }).join('');
     const s=r.summary;
+    // 최근 5일 평균: 실제 참석한 날짜 중 최근 PS_DAYS일의 게임만 모아 1게임당 평균
+    const rDates=[];
+    gs.forEach(g=>{if(rDates.indexOf(g[0])<0)rDates.push(g[0])});
+    rDates.sort().reverse();
+    const rSet={};rDates.slice(0,PS_DAYS).forEach(d=>{rSet[d]=1});
+    const rc={days:Math.min(rDates.length,PS_DAYS),games:0,pts:0,wins:0,losses:0,draws:0,
+      totals:new Array(RS_KEYS.length).fill(0)};
+    gs.forEach(g=>{
+      if(!rSet[g[0]])return;
+      rc.games++;
+      g.slice(5,5+RS_KEYS.length).forEach((v,i)=>{rc.totals[i]+=Number(v)||0});
+      rc.pts+=Number(g[5+RS_KEYS.length])||0;
+      const o=g[6+RS_KEYS.length];
+      if(o==='W')rc.wins++;else if(o==='L')rc.losses++;else if(o==='D')rc.draws++;
+    });
+    const recentRow=rc.games
+      ? '<tr><td class="ps-name">최근 '+PS_DAYS+'일 평균</td><td colspan="2">'+rc.days+'일 / '+rc.games+'게임</td><td>'+
+        (psWinRate(rc)<0?'-':'승률 '+Math.round(psWinRate(rc)*100)+'%')+'</td>'+
+        psCells(rc.totals,rc.pts,rc.games)+'</tr>'
+      : '';
     // 합계·경기 평균: 게임+팀 칸을 합쳐 일수/게임수를 쓰고, 승-패·승률은 승패 열에 맞춘다
     const foot=s
       ? '<tfoot><tr><td class="ps-name">합계</td><td colspan="2">'+s.days+'일 / '+s.games+'게임</td><td>'+psWinLabel(s)+'</td>'+
         psCells(s.totals,s.pts,1)+'</tr>'+
         '<tr><td class="ps-name">경기 평균</td><td colspan="2">전체 기간</td><td>'+
         (psWinRate(s)<0?'-':'승률 '+Math.round(psWinRate(s)*100)+'%')+'</td>'+
-        psCells(s.totals,s.pts,s.games||1)+'</tr></tfoot>'
+        psCells(s.totals,s.pts,s.games||1)+'</tr>'+recentRow+'</tfoot>'
       : '';
     openModal(
       '<div class="rs-hd"><h3>📈 '+esc(name)+'</h3><div style="display:flex;gap:6px">'+rotateBtnHtml()+
