@@ -425,7 +425,11 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
 
   /* ===== 화면 회전(가로 보기) ===== */
   body.rs-rot{overflow:hidden}
-  body.rs-rot #modal{padding:0}
+  html.rs-rot-html{overflow:hidden;overscroll-behavior:none}
+  /* 돌리기 전 창 폭(=화면 높이)이 화면보다 넓어서 카톡 등 인앱 브라우저가 페이지를 그만큼 넓게 잡는다
+     → 화면 중앙이 오른쪽으로 밀려 반만 보이던 문제. 배경을 기준 상자로 만들고(transform) 넘친 부분을 잘라
+     페이지 폭이 늘어나지 않게 한다. */
+  body.rs-rot #modal{padding:0;overflow:hidden;transform:translateZ(0)}
   /* 크기는 JS 가 실제로 보이는 영역을 재서 --rot-w/--rot-h 로 넣어준다.
      카톡·인스타 등 인앱 브라우저는 100vh/100dvh 가 실제 화면과 달라 화면이 잘려 보인다. */
   body.rs-rot .modal{position:fixed;top:50%;left:50%;width:100vh;height:100vw;width:100dvh;height:100dvw;
@@ -3139,15 +3143,21 @@ function rsToggleRotate(){
 function rsRotSizeApply(){
   const vv=window.visualViewport;
   const de=document.documentElement;
-  const w=Math.round((vv&&vv.width)||de.clientWidth||window.innerWidth);
-  const h=Math.round((vv&&vv.height)||de.clientHeight||window.innerHeight);
+  // 인앱 브라우저는 페이지가 넓어진 순간 visualViewport 폭을 크게 알려 주기도 한다 → 가장 작은 값을 쓴다
+  const ws=[vv&&vv.width,de.clientWidth,window.innerWidth,window.screen&&screen.width].filter(x=>x>0);
+  const hs=[vv&&vv.height,window.innerHeight].filter(x=>x>0);
+  const w=Math.round(Math.min.apply(null,ws.length?ws:[0]));
+  const h=Math.round(Math.min.apply(null,hs.length?hs:[0]));
   if(!w||!h)return;
+  if(w>h&&document.body.classList.contains('rs-rot'))return;   // 세로로 든 채 돌리는 모드이므로 잘못 잰 값은 버린다
+  try{if(window.scrollX)window.scrollTo(0,window.scrollY)}catch(e){}   // 옆으로 밀려 있으면 되돌린다
   document.body.style.setProperty('--rot-w',h+'px');
   document.body.style.setProperty('--rot-h',w+'px');
   document.body.classList.toggle('rs-rot-sm',h<=720);   // 작은 폰: 표를 더 촘촘하게
 }
 function rsCssRotate(){
   rsRotSizeApply();
+  document.documentElement.classList.add('rs-rot-html');
   document.body.classList.add('rs-rot');
   rsRotOn=true;rsRotNative=false;
   rsRotBtnLabel();
@@ -3164,6 +3174,7 @@ function rsRotOff(){
   document.body.style.removeProperty('--rot-w');
   document.body.style.removeProperty('--rot-h');
   document.body.classList.remove('rs-rot','rs-rot-sm');
+  document.documentElement.classList.remove('rs-rot-html');
   rsRotOn=false;rsRotNative=false;
   rsRotBtnLabel();
 }
