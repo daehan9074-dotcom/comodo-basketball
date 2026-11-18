@@ -513,6 +513,19 @@ window.__initReq = fetchJsonp(SCRIPT_URL, {action:'init'}).catch(e=>{console.war
   .ps-win{color:#1c7ed6;font-weight:800}
   .ps-lose{color:#d9480f;font-weight:800}
   /* 누적 선수 기록: 머리글을 누르면 그 항목 순으로 정렬 */
+  /* 선수 평가 카드 */
+  .ev-card{border:1.5px solid #cfe0cf;background:#f6faf5;border-radius:12px;padding:12px 14px;margin:4px 0 12px}
+  .ev-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ev-type{background:var(--green);color:#fff;font-weight:800;font-size:.8rem;padding:3px 11px;border-radius:100px}
+  .ev-date{font-size:.72rem;color:#7a746c;margin-left:auto}
+  .ev-line{margin:9px 0 8px;font-size:.9rem;font-weight:700;color:#24352a;line-height:1.5}
+  .ev-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:560px){.ev-cols{grid-template-columns:1fr}}
+  .ev-lb{font-size:.78rem;font-weight:800;margin-bottom:3px}
+  .ev-lb.good{color:#1d5620}.ev-lb.bad{color:#a2551b}.ev-lb.up{color:#2f5f8a;margin-top:8px}
+  .ev-ul{margin:0;padding-left:18px;font-size:.8rem;line-height:1.6;color:#3a352f}
+  .ev-none{font-size:.78rem;color:#a8a29a;margin:0}
+  .ev-foot{font-size:.68rem;color:#8a8278;margin:9px 0 0}
   /* 선수 지표표 */
   .av-tbl thead tr.av-grp th{background:#1e4a20;font-size:.66rem;padding:3px 4px;position:static}
   .av-tbl th.av-공격{background:#2f5f8a}
@@ -3634,10 +3647,30 @@ function psMyStat(){
 async function psPlayer(name){
   openModal('<h3>📈 '+esc(name)+'</h3><p class="ld">불러오는 중...</p>',true);
   try{
+    // 기록과 선수 평가를 함께 받는다 (평가는 실패해도 기록은 보여 준다)
+    const evP=fetchJsonp(SCRIPT_URL,{action:'evals',name}).catch(()=>null);
     const r=await fetchJsonp(SCRIPT_URL,{action:'stats',mode:'player',name});
     if(!r||!r.ok){toast('불러오기 실패','error');psRenderSummary();return}
+    const ev=await evP;
+    r.evalInfo=(ev&&ev.ok&&ev.evals&&ev.evals[0])||null;
     psRenderPlayer(name,r);
   }catch(e){toast('통신 실패','error');psRenderSummary()}
+}
+/* 선수 평가 카드 (서버 '평가' 시트, 매주 월요일 자동 갱신) */
+function psEvalCard(e){
+  if(!e)return '';
+  const li=(arr,cls)=>arr&&arr.length?'<ul class="ev-ul '+cls+'">'+arr.map(t=>'<li>'+esc(t)+'</li>').join('')+'</ul>':'';
+  return '<div class="ev-card">'+
+    '<div class="ev-hd"><span class="ev-type">'+esc(e.type)+'</span>'+
+    '<span class="ev-date">'+esc(e.date||'')+' 기준 · '+e.games+'경기</span></div>'+
+    '<p class="ev-line">'+esc(e.line)+'</p>'+
+    '<div class="ev-cols">'+
+    '<div class="ev-col"><div class="ev-lb good">👍 강점</div>'+(li(e.good,'good')||'<p class="ev-none">두드러진 항목 없음</p>')+'</div>'+
+    '<div class="ev-col"><div class="ev-lb bad">🎯 보완점</div>'+(li(e.bad,'bad')||'<p class="ev-none">두드러진 항목 없음</p>')+'</div>'+
+    '</div>'+
+    (e.up&&e.up.length?'<div class="ev-lb up">📈 지난주보다 좋아진 점</div>'+li(e.up,'up'):'')+
+    '<p class="ev-foot">본인이 참석한 최근 5일 기록을 다른 선수들과 비교해 자동으로 만든 평가입니다. 매주 월요일에 새로 바뀝니다.</p>'+
+    '</div>';
 }
 /* 받아 둔 데이터로 개인 기록 화면을 그린다 (회전 시 다시 그릴 때도 이 함수를 쓴다) */
 function psRenderPlayer(name,r){
@@ -3691,6 +3724,7 @@ function psRenderPlayer(name,r){
     openModal(
       '<div class="rs-hd"><h3>📈 '+esc(name)+'</h3><div style="display:flex;gap:6px">'+rotateBtnHtml()+
       '<button class="rs-tool" onclick="psRenderSummary()">← 목록으로</button></div></div>'+
+      psEvalCard(r.evalInfo)+
       (hasVid?'<p class="ps-note" style="margin-bottom:8px">'+
         '<span class="ps-yt">▶ 날짜</span>를 누르면 그 경기 영상이 새 창에서 열립니다.</p>':'')+
       (gs.length
