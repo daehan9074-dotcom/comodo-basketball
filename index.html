@@ -1260,6 +1260,7 @@ function renderTeamGenerator(){
     '<div class="modal-actions">'+
       '<button class="btn-primary" onclick="tgBuild()">수동 배정</button>'+
       '<button class="btn-primary" onclick="tgRandom()">🎲 랜덤 배정</button>'+
+      '<button class="btn-primary" id="tgSkillBtn" style="background:#5b3a7a" onclick="tgSkill()">⚖️ 실력 균형<br>배정</button>'+
       '<button class="btn-secondary" onclick="tgLoadSaved()">저장된 팀<br>불러오기</button>'+
     '</div>'+
     '<div id="tgResult"></div>'
@@ -1305,7 +1306,80 @@ function tgBuild(){
   }
   renderTeamResult();
 }
-function tgRandom(){
+/* ===== 실력 균형 배정 =====
+   선수 기록(본인 참석 최근 5일)으로 실력 점수를 잡고, 팀 평균 실력이 비슷해지도록 나눈다.
+   실력 점수 = 효율 50% + 승률 25% + 수비 25% (50 이 전체 평균, 10 이 표준편차)
+   효율 = 1게임 평균 (득점 + 리바운드 + 어시스트 + 스틸 + 블락 − 놓친 야투 − 놓친 자유투 − 턴오버)
+   수비 = 스틸+블락 비율(STK%) 과 수비 효율(DRtg, 낮을수록 좋음) 의 평균
+   게임 수가 적은 선수는 전체 평균 쪽으로 당겨 쓰고(3게임 가중), 기록이 없는 선수·게스트는 전체 평균으로 본다. */
+let tgSkillMap=null;      // {이름: 실력 점수} — 한 번 불러오면 팀 머리글에 평균 실력을 보여 준다
+let tgSkillMean=50,tgSkillStd=10;
+const TG_SKILL_K=3;
+function tgSkillOf(name){
+  return (tgSkillMap&&tgSkillMap[name]!=null)?tgSkillMap[name]:tgSkillMean;
+}
+function tgBuildSkillMap(players){
+  const ps=(players||[]).filter(p=>p&&p.games&&p.totals);
+  const map={};
+  if(!ps.length){tgSkillMap=map;tgSkillMean=50;tgSkillStd=10;return}
+  const z=vals=>{
+    const v=vals.filter(x=>x!=null);
+    if(v.length<2)return vals.map(()=>0);
+    const m=v.reduce((s,x)=>s+x,0)/v.length;
+    const sd=Math.sqrt(v.reduce((s,x)=>s+(x-m)*(x-m),0)/v.length)||1;
+    return vals.map(x=>x==null?0:(x-m)/sd);
+  };
+  const col=k=>AV_COLS.find(c=>c.k===k);
+  const zE=z(ps.map(p=>{
+    const t=p.totals;
+    const miss=(t[RS_IDX.p2a]-t[RS_IDX.p2m])+(t[RS_IDX.p3a]-t[RS_IDX.p3m])+(t[RS_IDX.fta]-t[RS_IDX.ftm]);
+    return ((p.pts||0)+t[RS_IDX.reb]+t[RS_IDX.ast]+t[RS_IDX.stl]+t[RS_IDX.blk]-miss-t[RS_IDX.tov])/p.games;
+  }));
+  // 승률은 경기 수가 적으면 5할 쪽으로 당긴다
+  const zW=z(ps.map(p=>{
+    const n=(p.wins||0)+(p.losses||0)+(p.draws||0);
+    return n>0?((p.wins||0)+0.5*(p.draws||0)+0.5*TG_SKILL_K)/(n+TG_SKILL_K):null;
+  }));
+  const zS=z(ps.map(p=>avVal(p,col('stk'))));
+  const zD=z(ps.map(p=>{const v=avVal(p,col('drtg'));return v==null?null:-v}));
+  ps.forEach((p,i)=>{
+    const c=0.5*zE[i]+0.25*zW[i]+0.25*(zS[i]+zD[i])/2;
+    map[p.name]=50+10*c*p.games/(p.games+TG_SKILL_K);
+  });
+  const vals=Object.values(map);
+  const m2=vals.reduce((s,v)=>s+v,0)/vals.length;
+  const sd=Math.sqrt(vals.reduce((s,v)=>s+(v-m2)*(v-m2),0)/vals.length);
+  tgSkillMap=map;tgSkillMean=m2;tgSkillStd=sd>1e-9?sd:1;
+}
+let tgSkillBusy=false;
+async function tgSkill(){
+  if(tgSkillBusy)return;
+  if(tgMode==='ybob'){toast('YB vs OB 는 나이로 나누므로 실력 균형 배정을 쓸 수 없습니다','error');return}
+  if(getAttendees(tgDay).length===0&&collectGuests().length===0){toast(tgDay+' 참석자가 없습니다','error');return}
+  if(!psSummary){
+    tgSkillBusy=true;
+    const btn=document.getElementById('tgSkillBtn');
+    if(btn){btn.disabled=true;btn.innerHTML='선수 기록<br>불러오는 중...'}
+    try{
+      const r=await fetchJsonp(SCRIPT_URL,{action:'stats',mode:'summary',days:PS_DAYS,activeMonths:PS_ACTIVE_MONTHS});
+      if(r&&r.ok)psSummary=r;
+    }catch(e){}
+    tgSkillBusy=false;
+    if(btn){btn.disabled=false;btn.innerHTML='⚖️ 실력 균형<br>배정'}
+    if(!psSummary){toast('선수 기록을 불러오지 못했습니다','error');return}
+    if(!document.getElementById('tgResult'))return;   // 기다리는 동안 창을 닫았으면 그만둔다
+  }
+  tgBuildSkillMap(psSummary.players);
+  if(!Object.keys(tgSkillMap).length){toast('저장된 경기 기록이 없어 실력을 계산할 수 없습니다','error');return}
+  const ok=tgRandom(true);
+  if(!ok)return;
+  const noRec=[];
+  tgTeams.forEach(t=>t.forEach(m=>{if(tgSkillMap[m.name]==null)noRec.push(m.name)}));
+  toast('실력 균형 배정 완료'+(noRec.length?' · 기록 없는 '+noRec.length+'명은 평균으로 계산':''),'success');
+}
+/* bySkill=true 면 팀 평균 실력 차이를 가장 먼저 줄인다 (같은 팀·다른 팀 조건, 제외, 포지션 분산은 그대로 지킨다) */
+function tgRandom(bySkill){
+  bySkill=bySkill===true;
   tgSavedDate='';
   const attendees=getAttendees(tgDay);
   const guests=collectGuests();
@@ -1346,9 +1420,23 @@ function tgRandom(){
     },0);
   }
 
+  // 팀 평균 실력의 흩어짐 (표준편차 단위, 낮을수록 균형). 포지션 점수보다 훨씬 크게 본다.
+  function skillScore(teams){
+    if(!bySkill)return 0;
+    const means=teams.map(t=>t.length?t.reduce((s,m)=>s+(tgSkillOf(m.name)-tgSkillMean)/tgSkillStd,0)/t.length:0);
+    const avg=means.reduce((a,b)=>a+b,0)/means.length;
+    return 300*means.reduce((s,v)=>s+(v-avg)*(v-avg),0);
+  }
+  function countViolations(teams){
+    return validDiff.filter(members=>{
+      const idxs=members.map(name=>{let r=-1;teams.forEach((t,i)=>{if(t.some(m=>m.name===name))r=i});return r}).filter(i=>i!==-1);
+      return new Set(idxs).size<idxs.length;
+    }).length;
+  }
+
   let bestTeams=null,bestViolations=Infinity,bestBalance=Infinity;
 
-  for(let attempt=0;attempt<80;attempt++){
+  for(let attempt=0;attempt<(bySkill?400:80);attempt++){
     const teams=Array.from({length:tgNumTeams},()=>[]);
 
     // 묶음 그룹 먼저 배정 (매 시도마다 순서 섞기)
@@ -1368,18 +1456,39 @@ function tgRandom(){
       });
     });
 
-    const violations=validDiff.filter(members=>{
-      const idxs=members.map(name=>{let r=-1;teams.forEach((t,i)=>{if(t.some(m=>m.name===name))r=i});return r}).filter(i=>i!==-1);
-      return new Set(idxs).size<idxs.length;
-    }).length;
+    const violations=countViolations(teams);
 
-    const balance=balanceScore(teams);
+    const balance=balanceScore(teams)+skillScore(teams);
 
     if(violations<bestViolations||(violations===bestViolations&&balance<bestBalance)){
       bestViolations=violations;
       bestBalance=balance;
       bestTeams=teams.map(t=>[...t]);
       if(violations===0&&balance===0)break;
+    }
+  }
+
+  // 실력 균형: 묶이지 않은 선수끼리 팀을 맞바꿔 보며 더 고른 배정을 찾는다 (팀 인원 수는 그대로)
+  if(bySkill){
+    const free={};
+    singleGroups.forEach(g=>{free[g[0].name]=1});
+    for(let pass=0;pass<60;pass++){
+      let improved=false;
+      for(let a=0;a<bestTeams.length;a++)for(let b=a+1;b<bestTeams.length;b++){
+        for(let i=0;i<bestTeams[a].length;i++)for(let j=0;j<bestTeams[b].length;j++){
+          const x=bestTeams[a][i],y=bestTeams[b][j];
+          if(!free[x.name]||!free[y.name])continue;
+          bestTeams[a][i]=y;bestTeams[b][j]=x;
+          const v=countViolations(bestTeams);
+          const s=balanceScore(bestTeams)+skillScore(bestTeams);
+          if(v<bestViolations||(v===bestViolations&&s<bestBalance-1e-9)){
+            bestViolations=v;bestBalance=s;improved=true;
+          }else{
+            bestTeams[a][i]=x;bestTeams[b][j]=y;
+          }
+        }
+      }
+      if(!improved)break;
     }
   }
 
@@ -1391,6 +1500,7 @@ function tgRandom(){
   tgPool=[...excludedPlayers];
   if(bestViolations>0)toast('일부 다른 팀 조건을 만족하지 못했습니다','error');
   renderTeamResult();
+  return bestViolations===0;
 }
 function tgAddSame(){tgSameConstraints.push(['','']);renderTeamGenerator()}
 function tgAddSameMember(rowIdx){if(tgSameConstraints[rowIdx])tgSameConstraints[rowIdx].push('');renderTeamGenerator()}
@@ -1410,7 +1520,9 @@ function renderTeamResult(){
   const posTag=(p)=>'<span class="pos">'+({가드:'G',포워드:'F',센터:'C'}[p]||'-')+'</span>';
   const count=tgTeamCount();
   const teamsHtml=tgTeams.map((t,i)=>
-    '<div class="team-box"><h5>'+tgTeamLabel(i)+'팀 ('+t.length+'명)</h5>'+
+    '<div class="team-box"><h5>'+tgTeamLabel(i)+'팀 ('+t.length+'명)'+
+    (tgSkillMap&&t.length?'<div style="font-size:.7rem;font-weight:600;color:#5b3a7a;margin-top:2px">평균 실력 '+
+      (t.reduce((s,m)=>s+tgSkillOf(m.name),0)/t.length).toFixed(1)+'</div>':'')+'</h5>'+
     t.map((m,j)=>'<div class="team-member"><span>'+posTag(m.position)+' '+tgMemberDisplay(m)+'</span><button onclick="tgRemove('+i+','+j+')">✕</button></div>').join('')+
     '</div>'
   ).join('');
