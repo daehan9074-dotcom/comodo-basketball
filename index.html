@@ -1280,11 +1280,13 @@ function getAttendees(day){
   return currentMembers.filter(m=>voted.includes(m.name));
 }
 function collectGuests(){
-  // 다이얼로그로 추가한 임시 게스트(isAdHoc)만 수집.
-  // 시트 등록 게스트는 getAttendees()에서 이미 포함되므로 중복 방지.
+  // '회원·게스트 추가'로 대기에 넣은 사람(isAdHoc)만 수집 → 랜덤·실력 균형 배정에 함께 들어간다.
+  // 투표한 참석자는 getAttendees()에 이미 있으므로 (추가 후 투표한 경우 포함) 중복 방지.
+  const att=new Set(getAttendees(tgDay).map(m=>m.name));
   const guests=[];
-  tgTeams.forEach(t=>t.forEach(m=>{if(m&&m.isAdHoc)guests.push(m)}));
-  tgPool.forEach(m=>{if(m&&m.isAdHoc)guests.push(m)});
+  const add=m=>{if(m&&m.isAdHoc&&!att.has(m.name)){att.add(m.name);guests.push(m)}};
+  tgTeams.forEach(t=>t.forEach(add));
+  tgPool.forEach(add);
   return guests;
 }
 function tgBuild(){
@@ -1295,12 +1297,13 @@ function tgBuild(){
   if(tgMode==='ybob'){
     tgTeams=[[],[]];
     const unknown=[];
-    attendees.forEach(m=>{
+    // 추가한 회원도 나이를 알면 YB/OB 로 바로 나눈다 (직접 적은 게스트는 나이가 없어 대기로)
+    attendees.concat(guests).forEach(m=>{
       const age=parseInt(m.age,10);
       if(isNaN(age)){unknown.push(m);return}
       if(age>=40)tgTeams[1].push(m);else tgTeams[0].push(m);
     });
-    tgPool=unknown.concat(guests);
+    tgPool=unknown;
   }else{
     tgPool=attendees.concat(guests);
     tgTeams=Array.from({length:tgNumTeams},()=>[]);
@@ -1312,13 +1315,40 @@ function tgBuild(){
    실력 점수 = 효율 50% + 승률 25% + 수비 25% (50 이 전체 평균, 10 이 표준편차)
    효율 = 1게임 평균 (득점 + 리바운드 + 어시스트 + 스틸 + 블락 − 놓친 야투 − 놓친 자유투 − 턴오버)
    수비 = 스틸+블락 비율(STK%) 과 수비 효율(DRtg, 낮을수록 좋음) 의 평균
-   게임 수가 적은 선수는 전체 평균 쪽으로 당겨 쓰고(3게임 가중), 기록이 없는 선수·게스트는 전체 평균으로 본다. */
+   게임 수가 적은 선수는 전체 평균 쪽으로 당겨 쓴다(3게임 가중).
+   기록이 없는 선수·게스트는 실력 계산(팀 평균)에서 빼고, 기록 있는 선수끼리 맞춘 뒤
+   마지막에 인원 적은 팀으로 넣는다 (인원이 같은 팀이 여럿이면 포지션이 고르게 되는 팀으로). */
 let tgSkillMap=null;      // {이름: 실력 점수} — 한 번 불러오면 팀 머리글에 평균 실력을 보여 준다
 let tgSkillMean=50,tgSkillStd=10;
 let tgSkillUsed=false;    // 지금 보이는 팀이 실력 균형 배정 결과면 true → 버튼 아래에 배정 규칙 설명을 보여 준다
 const TG_SKILL_K=3;
-function tgSkillOf(name){
-  return (tgSkillMap&&tgSkillMap[name]!=null)?tgSkillMap[name]:tgSkillMean;
+const TG_SKILL_TOL=1.5;    // 가장 고른 배정과 이 점수 이내면 '사실상 같은 배정'으로 보고 그중 무작위로 고른다
+const TG_POS_SKILL_W=3;   // 포지션별 실력 고르게 나누기의 비중 (0 이면 팀 전체 평균만 맞춤)
+/* 팀 머리글의 평균 실력 — 실력 점수가 없는 선수(게스트·기록 없는 회원)는 빼고 계산 */
+const TG_SKILL_GAP_WARN=1;   // 팀 평균 실력 차이가 이 점수를 넘으면 가장 높은 팀·낮은 팀에 (강한 팀)·(약한 팀) 표시
+function tgTeamSkillAvg(t){
+  if(!tgSkillMap)return null;
+  const rec=t.filter(m=>tgSkillMap[m.name]!=null);
+  return rec.length?rec.reduce((s,m)=>s+tgSkillMap[m.name],0)/rec.length:null;
+}
+function tgTeamSkillHtml(t){
+  if(!tgSkillMap||!t.length)return '';
+  const avg=tgTeamSkillAvg(t);
+  const ex=t.filter(m=>tgSkillMap[m.name]==null).length;
+  const sty='style="font-size:.7rem;font-weight:600;color:#5b3a7a;margin-top:2px"';
+  if(avg==null)return '<div '+sty+'>평균 실력 -</div>';
+  // 팀끼리 차이가 크면 강한 팀·약한 팀 표시
+  const all=tgTeams.map(tgTeamSkillAvg).filter(v=>v!=null);
+  let mark='';
+  if(all.length>=2){
+    const hi=Math.max(...all),lo=Math.min(...all);
+    if(hi-lo>TG_SKILL_GAP_WARN){
+      if(avg===hi)mark=' <span style="color:#c0392b;font-weight:800">(강한 팀)</span>';
+      else if(avg===lo)mark=' <span style="color:#1565c0;font-weight:800">(약한 팀)</span>';
+    }
+  }
+  return '<div '+sty+'>평균 실력 '+avg.toFixed(1)+mark+
+    (ex?' <span style="font-weight:500;color:#8a7a98">(기록 없는 '+ex+'명 제외)</span>':'')+'</div>';
 }
 function tgBuildSkillMap(players){
   const ps=(players||[]).filter(p=>p&&p.games&&p.totals);
@@ -1377,7 +1407,7 @@ async function tgSkill(){
   if(!ok)return;
   const noRec=[];
   tgTeams.forEach(t=>t.forEach(m=>{if(tgSkillMap[m.name]==null)noRec.push(m.name)}));
-  toast('실력 균형 배정 완료'+(noRec.length?' · 기록 없는 '+noRec.length+'명은 평균으로 계산':''),'success');
+  toast('실력 균형 배정 완료'+(noRec.length?' · 기록 없는 '+noRec.length+'명은 실력 계산에서 빼고 인원 적은 팀으로':''),'success');
 }
 /* bySkill=true 면 팀 평균 실력 차이를 가장 먼저 줄인다 (같은 팀·다른 팀 조건, 제외, 포지션 분산은 그대로 지킨다) */
 function tgRandom(bySkill){
@@ -1411,8 +1441,18 @@ function tgRandom(bySkill){
   const groups=Object.values(groupMap);
 
   // 단독 그룹(제약 없음)과 묶음 그룹 분리
-  const singleGroups=groups.filter(g=>g.length===1);
+  let singleGroups=groups.filter(g=>g.length===1);
   const multiGroups=groups.filter(g=>g.length>1);
+
+  // 실력 균형: 실력 점수가 없는 선수(게스트·기록 없는 회원)는 먼저 빼 두고,
+  // 기록 있는 선수끼리 실력을 맞춘 뒤 마지막에 인원이 모자란 팀으로 넣는다. (같은 팀·다른 팀 조건에 걸린 선수는 그대로 함께 배정)
+  const inDiff={};
+  validDiff.forEach(members=>members.forEach(n=>{inDiff[n]=1}));
+  const deferred=bySkill?singleGroups.map(g=>g[0]).filter(m=>tgSkillMap[m.name]==null&&!inDiff[m.name]):[];
+  if(deferred.length){
+    const dset=new Set(deferred.map(m=>m.name));
+    singleGroups=singleGroups.filter(g=>!dset.has(g[0].name));
+  }
 
   // 포지션 분산 점수 (낮을수록 균형)
   function balanceScore(teams){
@@ -1424,11 +1464,24 @@ function tgRandom(bySkill){
   }
 
   // 팀 평균 실력의 흩어짐 (표준편차 단위, 낮을수록 균형). 포지션 점수보다 훨씬 크게 본다.
+  // 실력 점수가 없는 선수(게스트·기록 없는 회원)는 팀 평균 계산에서 뺀다.
   function skillScore(teams){
     if(!bySkill)return 0;
-    const means=teams.map(t=>t.length?t.reduce((s,m)=>s+(tgSkillOf(m.name)-tgSkillMean)/tgSkillStd,0)/t.length:0);
+    const means=teams.map(t=>{
+      const rec=t.filter(m=>tgSkillMap[m.name]!=null);
+      return rec.length?rec.reduce((s,m)=>s+(tgSkillMap[m.name]-tgSkillMean)/tgSkillStd,0)/rec.length:0;
+    });
     const avg=means.reduce((a,b)=>a+b,0)/means.length;
-    return 300*means.reduce((s,v)=>s+(v-avg)*(v-avg),0);
+    return 300*means.reduce((s,v)=>s+(v-avg)*(v-avg),0)+TG_POS_SKILL_W*posSkillScore(teams);
+  }
+  // 포지션별 실력의 흩어짐: 가드·포워드·센터마다 '평균보다 얼마나 잘하는지'를 팀별로 더해, 팀끼리 차이가 작을수록 좋다.
+  // (한 팀에 잘하는 가드가 몰리고 다른 팀에 잘하는 포워드가 몰리는 식의 배정을 막는다)
+  function posSkillScore(teams){
+    return ['가드','포워드','센터'].reduce((sum,pos)=>{
+      const sums=teams.map(t=>t.reduce((s,m)=>s+(m.position===pos&&tgSkillMap[m.name]!=null?(tgSkillMap[m.name]-tgSkillMean)/tgSkillStd:0),0));
+      const avg=sums.reduce((a,b)=>a+b,0)/sums.length;
+      return sum+sums.reduce((s,v)=>s+(v-avg)*(v-avg),0);
+    },0);
   }
   function countViolations(teams){
     return validDiff.filter(members=>{
@@ -1437,18 +1490,13 @@ function tgRandom(bySkill){
     }).length;
   }
 
-  let bestTeams=null,bestViolations=Infinity,bestBalance=Infinity;
-
-  for(let attempt=0;attempt<(bySkill?400:80);attempt++){
+  // 한 번의 시도: 무작위로 팀을 채운다 (묶음 그룹 먼저, 단독 인원은 포지션별로 인원 적은 팀에)
+  function buildOnce(){
     const teams=Array.from({length:tgNumTeams},()=>[]);
-
-    // 묶음 그룹 먼저 배정 (매 시도마다 순서 섞기)
     [...multiGroups].sort(()=>Math.random()-.5).forEach(group=>{
       const ti=teams.map((t,i)=>({i,n:t.length})).sort((a,b)=>a.n-b.n)[0].i;
       [...group].sort(()=>Math.random()-.5).forEach(m=>teams[ti].push(m));
     });
-
-    // 단독 인원은 포지션별(G→F→C→기타)로 분류 후 최소 팀에 순차 배정
     const byPos={가드:[],포워드:[],센터:[],기타:[]};
     singleGroups.forEach(g=>{(byPos[g[0].position]||byPos.기타).push(g[0])});
     Object.keys(byPos).forEach(p=>byPos[p].sort(()=>Math.random()-.5));
@@ -1458,42 +1506,69 @@ function tgRandom(bySkill){
         teams[ti].push(m);
       });
     });
-
-    const violations=countViolations(teams);
-
-    const balance=balanceScore(teams)+skillScore(teams);
-
-    if(violations<bestViolations||(violations===bestViolations&&balance<bestBalance)){
-      bestViolations=violations;
-      bestBalance=balance;
-      bestTeams=teams.map(t=>[...t]);
-      if(violations===0&&balance===0)break;
-    }
+    return teams;
   }
-
-  // 실력 균형: 묶이지 않은 선수끼리 팀을 맞바꿔 보며 더 고른 배정을 찾는다 (팀 인원 수는 그대로)
-  if(bySkill){
-    const free={};
-    singleGroups.forEach(g=>{free[g[0].name]=1});
-    for(let pass=0;pass<60;pass++){
+  const scoreOf=teams=>balanceScore(teams)+skillScore(teams);
+  // 실력 균형: 묶이지 않은 선수끼리 팀을 맞바꿔 보며 더 고른 배정을 찾는다 (팀 인원 수는 그대로).
+  // stopV·stopS 를 주면 그만큼 좋아진 순간 멈춘다 (가장 좋은 조합과 '사실상 같은' 여러 조합 중 하나를 얻기 위해)
+  const free={};
+  singleGroups.forEach(g=>{free[g[0].name]=1});
+  function improve(teams,stopV,stopS){
+    let bv=countViolations(teams),bs=scoreOf(teams);
+    const done=()=>stopS!=null&&bv<=stopV&&bs<=stopS;
+    for(let pass=0;pass<60&&!done();pass++){
       let improved=false;
-      for(let a=0;a<bestTeams.length;a++)for(let b=a+1;b<bestTeams.length;b++){
-        for(let i=0;i<bestTeams[a].length;i++)for(let j=0;j<bestTeams[b].length;j++){
-          const x=bestTeams[a][i],y=bestTeams[b][j];
-          if(!free[x.name]||!free[y.name])continue;
-          bestTeams[a][i]=y;bestTeams[b][j]=x;
-          const v=countViolations(bestTeams);
-          const s=balanceScore(bestTeams)+skillScore(bestTeams);
-          if(v<bestViolations||(v===bestViolations&&s<bestBalance-1e-9)){
-            bestViolations=v;bestBalance=s;improved=true;
-          }else{
-            bestTeams[a][i]=x;bestTeams[b][j]=y;
-          }
-        }
+      // 매번 같은 순서로 바꾸면 같은 결과로 몰리므로, 맞바꿀 후보 순서를 섞는다
+      const pairs=[];
+      for(let a=0;a<teams.length;a++)for(let b=a+1;b<teams.length;b++)
+        for(let i=0;i<teams[a].length;i++)for(let j=0;j<teams[b].length;j++)pairs.push([a,i,b,j]);
+      pairs.sort(()=>Math.random()-.5);
+      for(const [a,i,b,j] of pairs){
+        const x=teams[a][i],y=teams[b][j];
+        if(!free[x.name]||!free[y.name])continue;
+        teams[a][i]=y;teams[b][j]=x;
+        const v=countViolations(teams),s=scoreOf(teams);
+        if(v<bv||(v===bv&&s<bs-1e-9)){bv=v;bs=s;improved=true;if(done())break}
+        else{teams[a][i]=x;teams[b][j]=y}
       }
       if(!improved)break;
     }
+    return {teams,v:bv,s:bs};
   }
+
+  let bestTeams=null,bestViolations=Infinity,bestBalance=Infinity;
+  const consider=r=>{
+    if(r.v<bestViolations||(r.v===bestViolations&&r.s<bestBalance)){bestViolations=r.v;bestBalance=r.s;bestTeams=r.teams.map(t=>[...t])}
+  };
+  if(!bySkill){
+    for(let attempt=0;attempt<80;attempt++){
+      const teams=buildOnce();
+      consider({teams,v:countViolations(teams),s:scoreOf(teams)});
+      if(bestViolations===0&&bestBalance===0)break;
+    }
+  }else{
+    // 1) 여러 번 시작해 가장 고른 배정의 점수를 찾는다
+    for(let attempt=0;attempt<40;attempt++)consider(improve(buildOnce()));
+    // 2) 그 점수와 사실상 같은(TG_SKILL_TOL 이내) 배정 중 하나를 무작위로 고른다 → 누를 때마다 조합이 달라진다
+    for(let attempt=0;attempt<30;attempt++){
+      const r=improve(buildOnce(),bestViolations,bestBalance+TG_SKILL_TOL);
+      if(r.v<=bestViolations&&r.s<=bestBalance+TG_SKILL_TOL){bestTeams=r.teams;break}
+    }
+  }
+
+  // 빼 두었던 선수: 인원이 가장 적은 팀으로. 그런 팀이 여럿이면 포지션이 가장 고르게 되는 팀으로 (실력 계산에는 넣지 않음).
+  [...deferred].sort(()=>Math.random()-.5).forEach(m=>{
+    const minN=Math.min(...bestTeams.map(t=>t.length));
+    let pick=-1,pickScore=Infinity;
+    bestTeams.forEach((t,i)=>{
+      if(t.length!==minN)return;
+      t.push(m);
+      const s=balanceScore(bestTeams)+skillScore(bestTeams);
+      t.pop();
+      if(s<pickScore-1e-9){pickScore=s;pick=i}
+    });
+    bestTeams[pick].push(m);
+  });
 
   // 각 팀 내 G→F→C→기타 순 정렬
   const sortOrder={가드:0,포워드:1,센터:2};
@@ -1524,8 +1599,7 @@ function renderTeamResult(){
   const count=tgTeamCount();
   const teamsHtml=tgTeams.map((t,i)=>
     '<div class="team-box"><h5>'+tgTeamLabel(i)+'팀 ('+t.length+'명)'+
-    (tgSkillMap&&t.length?'<div style="font-size:.7rem;font-weight:600;color:#5b3a7a;margin-top:2px">평균 실력 '+
-      (t.reduce((s,m)=>s+tgSkillOf(m.name),0)/t.length).toFixed(1)+'</div>':'')+'</h5>'+
+    tgTeamSkillHtml(t)+'</h5>'+
     t.map((m,j)=>'<div class="team-member"><span>'+posTag(m.position)+' '+tgMemberDisplay(m)+'</span><button onclick="tgRemove('+i+','+j+')">✕</button></div>').join('')+
     '</div>'
   ).join('');
@@ -1546,7 +1620,7 @@ function renderTeamResult(){
         '<button class="pool-team-btn" style="background:#888;font-size:.65rem;min-width:auto;padding:0 5px" onclick="tgExclude('+i+')">제외</button>'+guestDel+'</span>';
     }).join('')+
     (poolNonExcluded.length===0?'<span style="color:#aaa;font-size:.8rem">모두 배정됨</span>':'')+
-    '<div><button class="tg-add-guest" onclick="tgAddGuestDialog()">+ 게스트 추가</button></div>'+
+    '<div><button class="tg-add-guest" onclick="tgAddGuestDialog()">+ 회원·게스트 추가</button></div>'+
     '</div>';
   const hasTeams=tgTeams.some(t=>t.length>0);
   const copyHtml=hasTeams?
@@ -1671,28 +1745,110 @@ function tgDeleteGuest(pi){
   tgPool.splice(pi,1);
   renderTeamResult();
 }
-function tgAddGuestDialog(){
+/* ===== 대기에 회원·게스트 추가 =====
+   회원 탭: 이 진행일에 투표하지 않은 회원을 명단에서 골라 넣는다 (여러 명 선택 가능)
+   게스트 탭: 이름·포지션을 직접 적어 넣는다
+   추가한 사람은 isAdHoc 표시 → 다시 배정해도 유지되고, 대기에서 X 로 뺄 수 있다. */
+let tgAddTab='member',tgAddSel=new Set(),tgAddQuery='';
+function tgPresentNames(){
+  const s=new Set(getAttendees(tgDay).map(m=>m.name));
+  tgTeams.forEach(t=>t.forEach(m=>{if(m)s.add(m.name)}));
+  tgPool.forEach(m=>{if(m)s.add(m.name)});
+  return s;
+}
+function tgAddGuestDialog(tab){
+  if(tab)tgAddTab=tab;else{tgAddTab='member';tgAddSel=new Set();tgAddQuery=''}
+  const tabBtn=(k,lbl)=>'<button class="tg-btn'+(tgAddTab===k?' active':'')+'" onclick="tgAddGuestDialog(\''+k+'\')">'+lbl+'</button>';
+  let body;
+  if(tgAddTab==='member'){
+    body='<div class="field"><input type="text" id="tgAddSearch" placeholder="이름 검색 (게스트·휴활회원은 검색하면 나옵니다)" autocomplete="off" value="'+esc(tgAddQuery)+'" oninput="tgAddQuery=this.value;tgAddRenderList()" /></div>'+
+      '<div id="tgAddList" style="max-height:46vh;overflow-y:auto"></div>';
+  }else{
+    body='<div class="field"><label class="main-label">이름</label>'+
+      '<input type="text" id="guestName" placeholder="게스트 이름" autocomplete="off" oninput="tgGuestSuggest()" /></div>'+
+      '<div class="field"><label class="main-label">포지션</label>'+
+      '<select id="guestPos"><option value="가드">가드</option><option value="포워드">포워드</option><option value="센터">센터</option></select></div>'+
+      // 등록된 게스트 버튼은 포지션 아래에 둔다 (새 게스트를 적을 때 이름 → 포지션 순서가 끊기지 않게)
+      '<div id="tgGuestSug" style="margin-bottom:6px"></div>';
+  }
   openModal(
-    '<h3>게스트 추가</h3>'+
-    '<div class="field"><label class="main-label">이름</label>'+
-    '<input type="text" id="guestName" placeholder="게스트 이름" autocomplete="off" /></div>'+
-    '<div class="field"><label class="main-label">포지션</label>'+
-    '<select id="guestPos"><option value="가드">가드</option><option value="포워드">포워드</option><option value="센터">센터</option></select></div>'+
+    '<h3>회원·게스트 추가</h3>'+
+    '<div class="tg-btn-row" style="margin-bottom:12px">'+tabBtn('member','회원')+tabBtn('guest','게스트')+'</div>'+
+    body+
     '<div class="modal-actions">'+
       '<button class="btn-secondary" onclick="renderTeamGenerator()">취소</button>'+
-      '<button class="btn-primary" onclick="tgConfirmGuest()">추가</button>'+
+      '<button class="btn-primary" id="tgAddOk" onclick="tgConfirmAdd()">추가</button>'+
     '</div>'
   );
+  if(tgAddTab==='member'){tgAddRenderList();return}
+  tgGuestSuggest();
   setTimeout(()=>{
     const el=document.getElementById('guestName');
     if(el){el.focus();el.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();tgConfirmGuest()}})}
   },80);
+}
+function tgIsHiddenMember(m){return !!(m.isGuest||m.memberType==='게스트'||m.isInactive||m.memberType==='휴활회원')}
+function tgMemberTypeTag(m){
+  const t=(m.isGuest||m.memberType==='게스트')?'게스트':((m.isInactive||m.memberType==='휴활회원')?'휴활':'');
+  return t?' <span style="font-size:.72em;opacity:.75">('+t+')</span>':'';
+}
+/* 게스트 탭: 이름을 적으면 명단에 등록된 게스트·휴활회원 중 맞는 사람을 보여 주고, 누르면 등록된 정보 그대로 추가 */
+function tgGuestSuggest(){
+  const box=document.getElementById('tgGuestSug');if(!box)return;
+  const q=String((document.getElementById('guestName')||{}).value||'').trim();
+  const present=tgPresentNames();
+  const lbl={가드:'G',포워드:'F',센터:'C'};
+  // 이름을 안 적었으면 등록된 게스트 전부, 적었으면 게스트·휴활회원 중 이름이 맞는 사람
+  const isG=m=>m.isGuest||m.memberType==='게스트';
+  const list=currentMembers.filter(m=>!present.has(m.name)&&(q?tgIsHiddenMember(m)&&m.name.indexOf(q)>=0:isG(m)));
+  box.innerHTML=list.length?
+    '<div style="font-size:.75rem;color:#888;margin-bottom:4px">'+(q?'명단에 있는 사람':'등록된 게스트')+' (누르면 바로 추가)</div><div class="tg-btn-row">'+
+    list.map(m=>'<button class="tg-btn" onclick="tgAddRegistered(\''+jsq(m.name)+'\')">'+(lbl[m.position]||'-')+' '+esc(m.name)+tgMemberTypeTag(m)+'</button>').join('')+'</div>':'';
+}
+function tgAddRegistered(name){
+  const m=currentMembers.find(x=>x.name===name);
+  if(!m||tgPresentNames().has(name))return;
+  tgPool.push(Object.assign({},m,{isAdHoc:true}));
+  renderTeamGenerator();
+}
+function tgAddRenderList(){
+  const box=document.getElementById('tgAddList');if(!box)return;
+  const present=tgPresentNames();
+  const q=tgAddQuery.trim();
+  const ord={가드:0,포워드:1,센터:2};
+  const lbl={가드:'G',포워드:'F',센터:'C'};
+  // 기본은 정회원만. 게스트·휴활회원은 이름을 검색했을 때만 나온다.
+  const list=currentMembers.filter(m=>!present.has(m.name)&&(q?m.name.indexOf(q)>=0:!tgIsHiddenMember(m)))
+    .sort((a,b)=>(ord[a.position]??3)-(ord[b.position]??3)||a.name.localeCompare(b.name,'ko'));
+  box.innerHTML=list.length?
+    '<div class="tg-btn-row">'+list.map(m=>
+      '<button class="tg-btn'+(tgAddSel.has(m.name)?' active':'')+'" onclick="tgAddToggle(\''+jsq(m.name)+'\')">'+
+        (lbl[m.position]||'-')+' '+esc(m.name)+tgMemberTypeTag(m)+'</button>'
+    ).join('')+'</div>':
+    '<div style="color:#aaa;font-size:.85rem;padding:10px 0">'+(q?'검색 결과가 없습니다':'추가할 정회원이 없습니다 (모두 참석·배정됨)')+'</div>';
+  const ok=document.getElementById('tgAddOk');
+  if(ok)ok.textContent=tgAddSel.size?'추가 ('+tgAddSel.size+'명)':'추가';
+}
+function tgAddToggle(name){
+  if(tgAddSel.has(name))tgAddSel.delete(name);else tgAddSel.add(name);
+  tgAddRenderList();
+}
+function tgConfirmAdd(){
+  if(tgAddTab==='guest'){tgConfirmGuest();return}
+  if(!tgAddSel.size){toast('추가할 회원을 선택하세요','error');return}
+  const present=tgPresentNames();
+  currentMembers.forEach(m=>{
+    if(tgAddSel.has(m.name)&&!present.has(m.name))tgPool.push(Object.assign({},m,{isAdHoc:true}));
+  });
+  tgAddSel=new Set();
+  renderTeamGenerator();
 }
 function tgConfirmGuest(){
   const name=(document.getElementById('guestName')||{}).value;
   const pos=(document.getElementById('guestPos')||{}).value;
   const n=String(name||'').trim();
   if(!n){toast('이름을 입력하세요','error');return}
+  if(tgPresentNames().has(n)){toast(n+' 은(는) 이미 명단에 있습니다','error');return}
   tgPool.push({name:n,position:pos||'가드',isGuest:true,isAdHoc:true,age:null});
   renderTeamGenerator();
 }
