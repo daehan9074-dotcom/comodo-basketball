@@ -1312,7 +1312,8 @@ function tgBuild(){
 }
 /* ===== 실력 균형 배정 =====
    선수 기록(본인 참석 최근 5일)으로 실력 점수를 잡고, 팀 평균 실력이 비슷해지도록 나눈다.
-   실력 점수 = 효율 50% + 승률 25% + 수비 25% (50 이 전체 평균, 10 이 표준편차)
+   실력 점수 = 득점 40% + 효율 20% + 승률 20% + 수비 20% (50 이 전체 평균, 10 이 표준편차)
+   득점 = 1게임 평균 득점 (11-25: 많이 넣는 선수가 성공률 감점에 묻혀 약하게 나와 따로 넣음)
    효율 = 1게임 평균 (득점 + 리바운드 + 어시스트 + 스틸 + 블락 − 놓친 야투 − 놓친 자유투 − 턴오버)
    수비 = 스틸+블락 비율(STK%) 과 수비 효율(DRtg, 낮을수록 좋음) 의 평균
    게임 수가 적은 선수는 전체 평균 쪽으로 당겨 쓴다(3게임 가중).
@@ -1367,6 +1368,8 @@ function tgBuildSkillMap(players){
     const miss=(t[RS_IDX.p2a]-t[RS_IDX.p2m])+(t[RS_IDX.p3a]-t[RS_IDX.p3m])+(t[RS_IDX.fta]-t[RS_IDX.ftm]);
     return ((p.pts||0)+t[RS_IDX.reb]+t[RS_IDX.ast]+t[RS_IDX.stl]+t[RS_IDX.blk]-miss-t[RS_IDX.tov])/p.games;
   }));
+  // 득점 = 1게임 평균 득점 (성공률과 상관없이 많이 넣는 선수를 따로 쳐 준다)
+  const zP=z(ps.map(p=>(p.pts||0)/p.games));
   // 승률은 경기 수가 적으면 5할 쪽으로 당긴다
   const zW=z(ps.map(p=>{
     const n=(p.wins||0)+(p.losses||0)+(p.draws||0);
@@ -1375,7 +1378,7 @@ function tgBuildSkillMap(players){
   const zS=z(ps.map(p=>avVal(p,col('stk'))));
   const zD=z(ps.map(p=>{const v=avVal(p,col('drtg'));return v==null?null:-v}));
   ps.forEach((p,i)=>{
-    const c=0.5*zE[i]+0.25*zW[i]+0.25*(zS[i]+zD[i])/2;
+    const c=0.4*zP[i]+0.2*zE[i]+0.2*zW[i]+0.2*(zS[i]+zD[i])/2;
     map[p.name]=50+10*c*p.games/(p.games+TG_SKILL_K);
   });
   const vals=Object.values(map);
@@ -1688,9 +1691,10 @@ function tgSkillInfoHtml(){
     '<ol style="margin:0;padding-left:18px">'+
       '<li '+li+'><b>실력 점수</b>: 각자 <b>본인이 참석한 최근 '+PS_DAYS+'일</b> 경기 기록으로 계산합니다. '+
         '<b>50점 ≈ 기록 있는 회원 전체 평균</b>입니다.</li>'+
-      '<li '+li+'><b>점수 구성</b>: 효율 <b>50%</b> + 승률 <b>25%</b> + 수비 <b>25%</b>'+
-        '<details style="margin-top:4px"><summary style="cursor:pointer;font-weight:700;color:#5b3a7a">📖 효율·승률·수비는 어떤 지표?</summary>'+
+      '<li '+li+'><b>점수 구성</b>: 득점 <b>40%</b> + 효율 <b>20%</b> + 승률 <b>20%</b> + 수비 <b>20%</b>'+
+        '<details style="margin-top:4px"><summary style="cursor:pointer;font-weight:700;color:#5b3a7a">📖 득점·효율·승률·수비는 어떤 지표?</summary>'+
         '<ul style="margin:4px 0 0;padding-left:16px">'+
+          '<li '+sub+'><b>득점</b>: 1게임 평균 득점. <b>높을수록 좋음</b></li>'+
           '<li '+sub+'><b>효율</b>: 1게임 평균 (득점 + 리바운드 + 어시스트 + 스틸 + 블락 − 놓친 야투 − 놓친 자유투 − 턴오버). '+
             '많이 넣고 덜 놓치고 공을 덜 잃을수록 높습니다. <b>높을수록 좋음</b></li>'+
           '<li '+sub+'><b>승률</b>: 내가 뛴 게임에서 이긴 비율. <b>높을수록 좋음</b></li>'+
