@@ -1317,8 +1317,9 @@ function tgBuild(){
    효율 = 1게임 평균 (득점 + 리바운드 + 어시스트 + 스틸 + 블락 − 놓친 야투 − 놓친 자유투 − 턴오버)
    수비 = 스틸+블락 비율(STK%) 과 수비 효율(DRtg, 낮을수록 좋음) 의 평균
    게임 수가 적은 선수는 전체 평균 쪽으로 당겨 쓴다(3게임 가중).
-   기록이 없는 선수·게스트는 실력 계산(팀 평균)에서 빼고, 기록 있는 선수끼리 맞춘 뒤
-   마지막에 인원 적은 팀으로 넣는다 (인원이 같은 팀이 여럿이면 포지션이 고르게 되는 팀으로). */
+   포지션이 먼저: 팀끼리 같은 포지션 인원 차이는 1명까지만 (센터는 대체가 안 되므로 가장 먼저 지킴),
+   그 안에서 팀 평균 실력을 맞춘다 (11-25).
+   기록이 없는 선수·게스트는 처음부터 같이 배정하되 실력 계산(팀 평균)에서만 뺀다. */
 let tgSkillMap=null;      // {이름: 실력 점수} — 한 번 불러오면 팀 머리글에 평균 실력을 보여 준다
 let tgSkillMean=50,tgSkillStd=10;
 let tgSkillUsed=false;    // 지금 보이는 팀이 실력 균형 배정 결과면 true → 버튼 아래에 배정 규칙 설명을 보여 준다
@@ -1410,7 +1411,7 @@ async function tgSkill(){
   if(!ok)return;
   const noRec=[];
   tgTeams.forEach(t=>t.forEach(m=>{if(tgSkillMap[m.name]==null)noRec.push(m.name)}));
-  toast('실력 균형 배정 완료'+(noRec.length?' · 기록 없는 '+noRec.length+'명은 실력 계산에서 빼고 인원 적은 팀으로':''),'success');
+  toast('실력 균형 배정 완료'+(noRec.length?' · 기록 없는 '+noRec.length+'명은 실력 계산에서 빼고 포지션만 맞춤':''),'success');
 }
 /* bySkill=true 면 팀 평균 실력 차이를 가장 먼저 줄인다 (같은 팀·다른 팀 조건, 제외, 포지션 분산은 그대로 지킨다) */
 function tgRandom(bySkill){
@@ -1447,14 +1448,18 @@ function tgRandom(bySkill){
   let singleGroups=groups.filter(g=>g.length===1);
   const multiGroups=groups.filter(g=>g.length>1);
 
-  // 실력 균형: 실력 점수가 없는 선수(게스트·기록 없는 회원)는 먼저 빼 두고,
-  // 기록 있는 선수끼리 실력을 맞춘 뒤 마지막에 인원이 모자란 팀으로 넣는다. (같은 팀·다른 팀 조건에 걸린 선수는 그대로 함께 배정)
-  const inDiff={};
-  validDiff.forEach(members=>members.forEach(n=>{inDiff[n]=1}));
-  const deferred=bySkill?singleGroups.map(g=>g[0]).filter(m=>tgSkillMap[m.name]==null&&!inDiff[m.name]):[];
-  if(deferred.length){
-    const dset=new Set(deferred.map(m=>m.name));
-    singleGroups=singleGroups.filter(g=>!dset.has(g[0].name));
+  // 실력 점수가 없는 선수(게스트·기록 없는 회원)도 처음부터 함께 배정한다 (11-25: 마지막에 따로 넣으면 센터가 한 팀에 몰렸음).
+  // 이들은 팀 평균 실력 계산에서만 빠진다.
+
+  // 포지션 고르기 (실력보다 먼저 지키는 조건): 팀끼리 같은 포지션 인원 차이가 2명 이상 나면 벌점.
+  // 센터는 다른 포지션으로 대체가 안 되므로 가드·포워드보다 훨씬 무겁게 본다.
+  const TG_POS_HARD_W={가드:1,포워드:1,센터:10};
+  function posPenalty(teams){
+    return ['가드','포워드','센터'].reduce((sum,pos)=>{
+      const counts=teams.map(t=>t.filter(m=>m.position===pos).length);
+      const over=Math.max(...counts)-Math.min(...counts)-1;
+      return sum+(over>0?over*TG_POS_HARD_W[pos]:0);
+    },0);
   }
 
   // 포지션 분산 점수 (낮을수록 균형)
@@ -1475,7 +1480,11 @@ function tgRandom(bySkill){
       return rec.length?rec.reduce((s,m)=>s+(tgSkillMap[m.name]-tgSkillMean)/tgSkillStd,0)/rec.length:0;
     });
     const avg=means.reduce((a,b)=>a+b,0)/means.length;
-    return 300*means.reduce((s,v)=>s+(v-avg)*(v-avg),0)+TG_POS_SKILL_W*posSkillScore(teams);
+    // 기록 없는 선수도 팀마다 고르게 (한 팀에 몰리지 않게, 가볍게만 본다)
+    const nr=teams.map(t=>t.filter(m=>tgSkillMap[m.name]==null).length);
+    const nrAvg=nr.reduce((a,b)=>a+b,0)/nr.length;
+    return 300*means.reduce((s,v)=>s+(v-avg)*(v-avg),0)+TG_POS_SKILL_W*posSkillScore(teams)+
+      nr.reduce((s,c)=>s+(c-nrAvg)*(c-nrAvg),0);
   }
   // 포지션별 실력의 흩어짐: 가드·포워드·센터마다 '평균보다 얼마나 잘하는지'를 팀별로 더해, 팀끼리 차이가 작을수록 좋다.
   // (한 팀에 잘하는 가드가 몰리고 다른 팀에 잘하는 포워드가 몰리는 식의 배정을 막는다)
@@ -1516,9 +1525,10 @@ function tgRandom(bySkill){
   // stopV·stopS 를 주면 그만큼 좋아진 순간 멈춘다 (가장 좋은 조합과 '사실상 같은' 여러 조합 중 하나를 얻기 위해)
   const free={};
   singleGroups.forEach(g=>{free[g[0].name]=1});
-  function improve(teams,stopV,stopS){
-    let bv=countViolations(teams),bs=scoreOf(teams);
-    const done=()=>stopS!=null&&bv<=stopV&&bs<=stopS;
+  // 비교 순서: 다른 팀 조건 위반 → 포지션 벌점(센터 우선) → 실력·포지션 분산 점수
+  function improve(teams,stopV,stopP,stopS){
+    let bv=countViolations(teams),bp=posPenalty(teams),bs=scoreOf(teams);
+    const done=()=>stopS!=null&&bv<=stopV&&bp<=stopP&&bs<=stopS;
     for(let pass=0;pass<60&&!done();pass++){
       let improved=false;
       // 매번 같은 순서로 바꾸면 같은 결과로 몰리므로, 맞바꿀 후보 순서를 섞는다
@@ -1530,48 +1540,36 @@ function tgRandom(bySkill){
         const x=teams[a][i],y=teams[b][j];
         if(!free[x.name]||!free[y.name])continue;
         teams[a][i]=y;teams[b][j]=x;
-        const v=countViolations(teams),s=scoreOf(teams);
-        if(v<bv||(v===bv&&s<bs-1e-9)){bv=v;bs=s;improved=true;if(done())break}
+        const v=countViolations(teams),p=posPenalty(teams),s=scoreOf(teams);
+        if(v<bv||(v===bv&&(p<bp||(p===bp&&s<bs-1e-9)))){bv=v;bp=p;bs=s;improved=true;if(done())break}
         else{teams[a][i]=x;teams[b][j]=y}
       }
       if(!improved)break;
     }
-    return {teams,v:bv,s:bs};
+    return {teams,v:bv,p:bp,s:bs};
   }
 
-  let bestTeams=null,bestViolations=Infinity,bestBalance=Infinity;
+  let bestTeams=null,bestViolations=Infinity,bestPos=Infinity,bestBalance=Infinity;
   const consider=r=>{
-    if(r.v<bestViolations||(r.v===bestViolations&&r.s<bestBalance)){bestViolations=r.v;bestBalance=r.s;bestTeams=r.teams.map(t=>[...t])}
+    if(r.v<bestViolations||(r.v===bestViolations&&(r.p<bestPos||(r.p===bestPos&&r.s<bestBalance)))){
+      bestViolations=r.v;bestPos=r.p;bestBalance=r.s;bestTeams=r.teams.map(t=>[...t]);
+    }
   };
   if(!bySkill){
     for(let attempt=0;attempt<80;attempt++){
       const teams=buildOnce();
-      consider({teams,v:countViolations(teams),s:scoreOf(teams)});
-      if(bestViolations===0&&bestBalance===0)break;
+      consider({teams,v:countViolations(teams),p:posPenalty(teams),s:scoreOf(teams)});
+      if(bestViolations===0&&bestPos===0&&bestBalance===0)break;
     }
   }else{
     // 1) 여러 번 시작해 가장 고른 배정의 점수를 찾는다
     for(let attempt=0;attempt<40;attempt++)consider(improve(buildOnce()));
-    // 2) 그 점수와 사실상 같은(TG_SKILL_TOL 이내) 배정 중 하나를 무작위로 고른다 → 누를 때마다 조합이 달라진다
+    // 2) 포지션은 그대로 지키면서 실력 점수가 사실상 같은(TG_SKILL_TOL 이내) 배정 중 하나를 무작위로 고른다 → 누를 때마다 조합이 달라진다
     for(let attempt=0;attempt<30;attempt++){
-      const r=improve(buildOnce(),bestViolations,bestBalance+TG_SKILL_TOL);
-      if(r.v<=bestViolations&&r.s<=bestBalance+TG_SKILL_TOL){bestTeams=r.teams;break}
+      const r=improve(buildOnce(),bestViolations,bestPos,bestBalance+TG_SKILL_TOL);
+      if(r.v<=bestViolations&&r.p<=bestPos&&r.s<=bestBalance+TG_SKILL_TOL){bestTeams=r.teams;break}
     }
   }
-
-  // 빼 두었던 선수: 인원이 가장 적은 팀으로. 그런 팀이 여럿이면 포지션이 가장 고르게 되는 팀으로 (실력 계산에는 넣지 않음).
-  [...deferred].sort(()=>Math.random()-.5).forEach(m=>{
-    const minN=Math.min(...bestTeams.map(t=>t.length));
-    let pick=-1,pickScore=Infinity;
-    bestTeams.forEach((t,i)=>{
-      if(t.length!==minN)return;
-      t.push(m);
-      const s=balanceScore(bestTeams)+skillScore(bestTeams);
-      t.pop();
-      if(s<pickScore-1e-9){pickScore=s;pick=i}
-    });
-    bestTeams[pick].push(m);
-  });
 
   // 각 팀 내 G→F→C→기타 순 정렬
   const sortOrder={가드:0,포워드:1,센터:2};
@@ -1689,6 +1687,7 @@ function tgSkillInfoHtml(){
   return '<div style="background:#f6f1fa;border:1.5px solid #d9c8e8;border-radius:12px;padding:12px 14px;margin:4px 0 14px;font-size:.8rem;line-height:1.6;color:#3d2a50">'+
     '<div style="font-weight:800;color:#5b3a7a;font-size:.88rem;margin-bottom:6px">⚖️ 이렇게 나눴어요</div>'+
     '<ol style="margin:0;padding-left:18px">'+
+      '<li '+li+'><b>포지션 먼저</b>: 팀끼리 가드·포워드·센터 인원 차이는 <b>1명까지만</b> (특히 <b>센터</b>는 가장 먼저 나눔). 그 안에서 팀 평균 실력을 맞춥니다.</li>'+
       '<li '+li+'><b>실력 점수</b>: 각자 <b>본인이 참석한 최근 '+PS_DAYS+'일</b> 경기 기록으로 계산합니다. '+
         '<b>50점 ≈ 기록 있는 회원 전체 평균</b>입니다.</li>'+
       '<li '+li+'><b>점수 구성</b>: 득점 <b>40%</b> + 효율 <b>20%</b> + 승률 <b>20%</b> + 수비 <b>20%</b>'+
